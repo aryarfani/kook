@@ -131,6 +131,7 @@ export default function WebhookEndpointsShow({
             isSelected
                 ? showEndpoint(webhookEndpoint)
                 : showEndpoint(webhookEndpoint, { query: { event: event.id } }),
+            {},
             {
                 only: ['selectedEvent'],
                 preserveState: true,
@@ -141,12 +142,16 @@ export default function WebhookEndpointsShow({
     };
 
     const closeEventPane = () => {
-        router.get(showEndpoint(webhookEndpoint), {
-            only: ['selectedEvent'],
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        });
+        router.get(
+            showEndpoint(webhookEndpoint),
+            {},
+            {
+                only: ['selectedEvent'],
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
     };
 
     return (
