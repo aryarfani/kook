@@ -19,3 +19,10 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
     Route::post('webhook-endpoints/{webhook_endpoint}/regenerate-signing-secret', [WebhookEndpointController::class, 'regenerateSigningSecret'])
         ->name('webhook-endpoints.regenerate-signing-secret');
 });
+
+// Throttled well below the read routes above: an export streams every event
+// for an endpoint, so it is far heavier than a single page view.
+Route::middleware(['auth', 'throttle:10,1'])->group(function () {
+    Route::get('webhook-endpoints/{webhook_endpoint}/events/export', [WebhookEndpointController::class, 'exportEvents'])
+        ->name('webhook-endpoints.export-events');
+});
