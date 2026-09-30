@@ -1,11 +1,13 @@
 <?php
 
+use App\Enums\WebhookEventStatus;
 use App\Models\AuditLog;
 use App\Models\Project;
 use App\Models\User;
 use App\Models\WebhookEndpoint;
 use App\Models\WebhookEvent;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 
 /**
  * @param  array<string, string>  $query
@@ -20,7 +22,7 @@ function exportUri(WebhookEndpoint $endpoint, array $query = []): string
 /**
  * @return array<int, array<string, mixed>>
  */
-function exportedEvents(Illuminate\Testing\TestResponse $response): array
+function exportedEvents(TestResponse $response): array
 {
     return json_decode($response->streamedContent(), true, flags: JSON_THROW_ON_ERROR);
 }
@@ -66,7 +68,7 @@ test('the export contains the payload, headers and raw body of each event', func
         'headers' => ['content-type' => 'application/json', 'x-custom' => 'yes'],
         'payload' => json_decode($rawBody, true),
         'raw_body' => $rawBody,
-        'status' => App\Enums\WebhookEventStatus::Success,
+        'status' => WebhookEventStatus::Success,
     ]);
 
     $exported = exportedEvents($this->actingAs($user)->get(exportUri($endpoint)));
