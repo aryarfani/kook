@@ -94,7 +94,7 @@ class WebhookEndpointController extends Controller
 
                     fwrite($stream, "\n    ".json_encode([
                         'id' => $event->id,
-                        'received_at' => $event->received_at?->toIso8601String(),
+                        'received_at' => $event->received_at->toIso8601String(),
                         'event_name' => $event->event_name,
                         'status' => $event->status->value,
                         'signature_valid' => $event->signature_valid,
