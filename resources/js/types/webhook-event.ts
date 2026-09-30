@@ -35,10 +35,11 @@ export type WebhookEventDetail = {
 };
 
 /**
- * The standalone page additionally gets the endpoint it belongs to, which is
- * what the back link and the replay action need.
+ * The event detail plus the endpoint it arrived at. The standalone event page
+ * needs it for its back link and replay action, and the project events tab
+ * needs it because its pane mixes events from several endpoints.
  */
-export type WebhookEventPageDetail = WebhookEventDetail & {
+export type WebhookEventWithEndpoint = WebhookEventDetail & {
     webhookEndpoint: {
         id: string;
         name: string;

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\WebhookEndpointMode;
 use App\Models\Project;
 use App\Models\User;
 use App\Models\WebhookDelivery;
@@ -197,6 +198,76 @@ test('the endpoint page ignores a malformed event id', function () {
         ->get("/webhook-endpoints/{$endpoint->id}?event=not-a-uuid")
         ->assertInertia(fn ($page) => $page
             ->component('webhook-endpoints/show')
+            ->where('selectedEvent', null)
+        );
+});
+
+test('the project events tab exposes the event named in the query string for its pane', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->for($user)->create();
+    $endpoint = WebhookEndpoint::factory()->for($project)->create();
+    $event = WebhookEvent::factory()->create([
+        'webhook_endpoint_id' => $endpoint->id,
+        'project_id' => $project->id,
+    ]);
+    WebhookDelivery::factory()->for($event, 'event')->create(['attempt_number' => 1]);
+
+    $this->actingAs($user)
+        ->get("/projects/{$project->id}?tab=events&event={$event->id}")
+        ->assertInertia(fn ($page) => $page
+            ->component('projects/show')
+            ->where('selectedEvent.event.id', $event->id)
+            ->where('selectedEvent.event.raw_body', $event->raw_body)
+            ->has('selectedEvent.deliveries', 1)
+        );
+});
+
+test('the project events tab carries the mode of the event endpoint', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->for($user)->create();
+    $captureEndpoint = WebhookEndpoint::factory()->for($project)->create([
+        'mode' => WebhookEndpointMode::Capture,
+    ]);
+    $event = WebhookEvent::factory()->create([
+        'webhook_endpoint_id' => $captureEndpoint->id,
+        'project_id' => $project->id,
+    ]);
+
+    $this->actingAs($user)
+        ->get("/projects/{$project->id}?tab=events&event={$event->id}")
+        ->assertInertia(fn ($page) => $page
+            ->component('projects/show')
+            ->where('selectedEvent.event.webhookEndpoint.id', $captureEndpoint->id)
+            ->where('selectedEvent.event.webhookEndpoint.mode', WebhookEndpointMode::Capture->value)
+        );
+});
+
+test('the project events tab ignores an event that belongs to another project', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->for($user)->create();
+    $otherProject = Project::factory()->for($user)->create();
+    $otherEndpoint = WebhookEndpoint::factory()->for($otherProject)->create();
+    $otherEvent = WebhookEvent::factory()->create([
+        'webhook_endpoint_id' => $otherEndpoint->id,
+        'project_id' => $otherProject->id,
+    ]);
+
+    $this->actingAs($user)
+        ->get("/projects/{$project->id}?tab=events&event={$otherEvent->id}")
+        ->assertInertia(fn ($page) => $page
+            ->component('projects/show')
+            ->where('selectedEvent', null)
+        );
+});
+
+test('the project events tab ignores a malformed event id', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->for($user)->create();
+
+    $this->actingAs($user)
+        ->get("/projects/{$project->id}?tab=events&event=not-a-uuid")
+        ->assertInertia(fn ($page) => $page
+            ->component('projects/show')
             ->where('selectedEvent', null)
         );
 });

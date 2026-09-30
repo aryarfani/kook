@@ -7,13 +7,13 @@ import { EventDetailSections } from '@/components/webhook-events/event-detail-se
 import { ReplayEventButton } from '@/components/webhook-events/replay-event-button';
 import { eventStatusTone } from '@/lib/status-tones';
 import { show as showEndpoint } from '@/routes/webhook-endpoints';
-import type { WebhookDelivery, WebhookEventPageDetail } from '@/types';
+import type { WebhookDelivery, WebhookEventWithEndpoint } from '@/types';
 
 export default function EventsShow({
     event,
     deliveries,
 }: {
-    event: WebhookEventPageDetail;
+    event: WebhookEventWithEndpoint;
     deliveries: WebhookDelivery[];
 }) {
     return (
