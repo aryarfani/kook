@@ -32,6 +32,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { DeleteEndpointDialog } from '@/components/webhook-endpoints/delete-endpoint-dialog';
+import { ExportEventsDialog } from '@/components/webhook-endpoints/export-events-dialog';
 import { endpointHealth } from '@/lib/endpoint-health';
 import { providerSecretGuidance } from '@/lib/provider-secret-guidance';
 import { endpointStatusTone, eventStatusTone } from '@/lib/status-tones';
@@ -322,11 +323,14 @@ export default function WebhookEndpointsShow({
                 )}
 
                 <div className="rounded-2xl border border-border bg-card">
-                    <div className="border-b border-border px-6 py-4">
-                        <h2 className="font-semibold">Events</h2>
-                        <p className="text-sm text-muted-foreground">
-                            {events.total} received in total
-                        </p>
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-4">
+                        <div>
+                            <h2 className="font-semibold">Events</h2>
+                            <p className="text-sm text-muted-foreground">
+                                {events.total} received in total
+                            </p>
+                        </div>
+                        <ExportEventsDialog webhookEndpoint={webhookEndpoint} />
                     </div>
 
                     {events.data.length === 0 ? (
