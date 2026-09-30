@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\ForwardWebhookAction;
 use App\Enums\WebhookDeliveryStatus;
+use App\Enums\WebhookEndpointMode;
 use App\Exceptions\WebhookDeliveryFailedException;
 use App\Models\WebhookEvent;
 use App\Repositories\WebhookDeliveryRepository;
@@ -48,6 +49,13 @@ class ForwardWebhookDeliveryJob implements ShouldQueue
         $event = WebhookEvent::with('webhookEndpoint')->find($this->webhookEventId);
 
         if ($event === null) {
+            return;
+        }
+
+        // A receive-only endpoint has no destination to forward to. This is
+        // only reachable when the endpoint was switched over after a retry or
+        // replay had already been queued.
+        if ($event->webhookEndpoint->mode === WebhookEndpointMode::Capture) {
             return;
         }
 

@@ -58,9 +58,9 @@ export function CreateEndpointDialog({
             <DialogContent>
                 <DialogTitle>Create webhook endpoint</DialogTitle>
                 <DialogDescription>
-                    Choose transparent relay to forward webhooks as-is, or
-                    managed verification to have signatures checked
-                    automatically.
+                    Choose transparent relay to forward webhooks as-is, managed
+                    verification to have signatures checked automatically, or
+                    receive only to just store what arrives.
                 </DialogDescription>
 
                 <Form
@@ -82,18 +82,22 @@ export function CreateEndpointDialog({
                                 <InputError message={errors.name} />
                             </div>
 
-                            <div className="grid gap-2">
-                                <Label htmlFor="destination_url">
-                                    Destination URL
-                                </Label>
-                                <Input
-                                    id="destination_url"
-                                    name="destination_url"
-                                    required
-                                    placeholder="https://your-app.com/webhooks"
-                                />
-                                <InputError message={errors.destination_url} />
-                            </div>
+                            {mode !== 'capture' && (
+                                <div className="grid gap-2">
+                                    <Label htmlFor="destination_url">
+                                        Destination URL
+                                    </Label>
+                                    <Input
+                                        id="destination_url"
+                                        name="destination_url"
+                                        required
+                                        placeholder="https://your-app.com/webhooks"
+                                    />
+                                    <InputError
+                                        message={errors.destination_url}
+                                    />
+                                </div>
+                            )}
 
                             <div className="grid gap-2">
                                 <Label htmlFor="mode">Mode</Label>
@@ -113,6 +117,9 @@ export function CreateEndpointDialog({
                                         </SelectItem>
                                         <SelectItem value="managed">
                                             Managed verification
+                                        </SelectItem>
+                                        <SelectItem value="capture">
+                                            Receive only
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>

@@ -6,9 +6,13 @@ use App\Http\Requests\WebhookEndpoints\DestroyWebhookEndpointRequest;
 use App\Http\Requests\WebhookEndpoints\RegenerateSigningSecretRequest;
 use App\Http\Requests\WebhookEndpoints\StoreWebhookEndpointRequest;
 use App\Http\Requests\WebhookEndpoints\UpdateWebhookEndpointRequest;
+use App\Http\Resources\WebhookDeliveryResource;
+use App\Http\Resources\WebhookEventResource;
 use App\Models\Project;
 use App\Models\WebhookEndpoint;
+use App\Models\WebhookEvent;
 use App\Services\ProjectService;
+use App\Services\ProviderCatalogService;
 use App\Services\WebhookEndpointService;
 use App\Services\WebhookEventService;
 use Carbon\CarbonImmutable;
@@ -26,21 +30,33 @@ class WebhookEndpointController extends Controller
         private readonly WebhookEndpointService $endpoints,
         private readonly WebhookEventService $events,
         private readonly ProjectService $projects,
+        private readonly ProviderCatalogService $providers,
     ) {}
 
     public function show(Request $request, WebhookEndpoint $webhookEndpoint): Response
     {
         abort_unless($request->user()->can('view', $webhookEndpoint), 404);
 
+        $selectedEvent = $this->selectedEvent($request, $webhookEndpoint);
+
         return Inertia::render('webhook-endpoints/show', [
             'project' => $webhookEndpoint->project,
             'projects' => $this->projects->listForUser($request->user()),
+            'providers' => $this->providers->active(),
             'webhookEndpoint' => $webhookEndpoint->load([
                 'provider',
                 'latestEvent:id,webhook_endpoint_id,status,received_at',
                 'latestEvent.latestDelivery:id,event_id,status,attempt_number',
             ]),
             'events' => $this->events->listForEndpoint($webhookEndpoint),
+            // Drives the side-by-side pane. Opening an event is a partial
+            // reload of just this prop, so the list below it never re-renders.
+            'selectedEvent' => $selectedEvent === null ? null : [
+                'event' => (new WebhookEventResource($selectedEvent))->resolve($request),
+                'deliveries' => WebhookDeliveryResource::collection(
+                    $this->events->deliveriesFor($selectedEvent)
+                )->toArray($request),
+            ],
         ]);
     }
 
@@ -151,6 +167,22 @@ class WebhookEndpointController extends Controller
         ]);
 
         return to_route('webhook-endpoints.show', $webhookEndpoint);
+    }
+
+    /**
+     * The event the pane should show, scoped to this endpoint so a foreign id
+     * resolves to nothing rather than someone else's event. A malformed id is
+     * ignored outright - querying a uuid column with it would error.
+     */
+    private function selectedEvent(Request $request, WebhookEndpoint $webhookEndpoint): ?WebhookEvent
+    {
+        $eventId = $request->query('event');
+
+        if (! is_string($eventId) || ! Str::isUuid($eventId)) {
+            return null;
+        }
+
+        return $webhookEndpoint->events()->whereKey($eventId)->first();
     }
 
     /**

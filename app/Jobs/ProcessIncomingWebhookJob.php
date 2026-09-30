@@ -34,6 +34,14 @@ class ProcessIncomingWebhookJob implements ShouldQueue
 
         $endpoint = $event->webhookEndpoint;
 
+        if ($endpoint->mode === WebhookEndpointMode::Capture) {
+            // Receive-only: there is nothing to verify and nowhere to forward,
+            // so the event is stored and immediately considered handled.
+            $event->update(['status' => WebhookEventStatus::Success]);
+
+            return;
+        }
+
         if ($endpoint->mode === WebhookEndpointMode::Managed) {
             $verified = $this->verifySignature($event, $verifierFactory);
             $event->update(['signature_valid' => $verified]);

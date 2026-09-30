@@ -1,3 +1,5 @@
+import type { WebhookEndpointMode } from '@/types/webhook-endpoint';
+
 export type WebhookEventStatus =
     'pending' | 'processing' | 'success' | 'failed';
 export type WebhookDeliveryStatus =
@@ -16,6 +18,32 @@ export type WebhookEvent = {
     status: WebhookEventStatus;
     received_at: string;
     created_at: string;
+};
+
+/**
+ * The event shape behind the standalone event page and the endpoint page's
+ * side-by-side pane - both render the same detail component.
+ */
+export type WebhookEventDetail = {
+    id: string;
+    event_name: string | null;
+    status: WebhookEventStatus;
+    signature_valid: boolean | null;
+    received_at: string;
+    raw_body: string;
+    headers: Record<string, string>;
+};
+
+/**
+ * The standalone page additionally gets the endpoint it belongs to, which is
+ * what the back link and the replay action need.
+ */
+export type WebhookEventPageDetail = WebhookEventDetail & {
+    webhookEndpoint: {
+        id: string;
+        name: string;
+        mode: WebhookEndpointMode;
+    };
 };
 
 export type WebhookDelivery = {

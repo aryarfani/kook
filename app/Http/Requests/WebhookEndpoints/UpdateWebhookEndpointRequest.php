@@ -28,7 +28,9 @@ class UpdateWebhookEndpointRequest extends FormRequest
         return [
             'name' => $this->endpointNameRules(),
             'destination_url' => $this->destinationUrlRules(),
+            'mode' => $this->modeRules(),
             'status' => ['required', Rule::enum(WebhookEndpointStatus::class)],
+            'provider_id' => $this->providerIdRules(),
             'provider_secret' => $this->providerSecretUpdateRules(),
         ];
     }

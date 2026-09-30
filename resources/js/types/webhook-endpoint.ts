@@ -11,7 +11,7 @@ export type Provider = {
     is_active: boolean;
 };
 
-export type WebhookEndpointMode = 'relay' | 'managed';
+export type WebhookEndpointMode = 'relay' | 'managed' | 'capture';
 export type WebhookEndpointStatus = 'active' | 'paused' | 'disabled';
 
 export type WebhookEndpoint = {
@@ -19,7 +19,7 @@ export type WebhookEndpoint = {
     project_id: string;
     name: string;
     mode: WebhookEndpointMode;
-    destination_url: string;
+    destination_url: string | null;
     provider_id: string | null;
     provider: Provider | null;
     ingest_token: string;

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\WebhookEndpointMode;
 use App\Enums\WebhookEndpointStatus;
 use App\Models\Project;
 use App\Models\User;
@@ -32,7 +33,7 @@ class WebhookEndpointService
     public function create(User $user, Project $project, array $data): WebhookEndpoint
     {
         return DB::transaction(function () use ($user, $project, $data) {
-            $endpoint = $this->endpoints->make($project, $data);
+            $endpoint = $this->endpoints->make($project, $this->withoutDestinationForCapture($data));
 
             // Never mass-assignable: these are system-generated, not client input.
             $endpoint->forceFill([
@@ -65,7 +66,7 @@ class WebhookEndpointService
         }
 
         return DB::transaction(function () use ($user, $endpoint, $data) {
-            $endpoint = $this->endpoints->update($endpoint, $data);
+            $endpoint = $this->endpoints->update($endpoint, $this->withoutDestinationForCapture($data));
 
             $this->auditLog->record($user, $endpoint->project, 'webhook_endpoint.updated', $endpoint);
 
@@ -94,6 +95,23 @@ class WebhookEndpointService
 
             $this->endpoints->delete($endpoint);
         });
+    }
+
+    /**
+     * A receive-only endpoint has nowhere to forward to, so any destination
+     * is dropped on the way in - the form hides the field for that mode, which
+     * means an update would otherwise leave a stale URL behind.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function withoutDestinationForCapture(array $data): array
+    {
+        if (($data['mode'] ?? null) !== WebhookEndpointMode::Capture->value) {
+            return $data;
+        }
+
+        return [...$data, 'destination_url' => null];
     }
 
     private function uniqueIngestToken(): string

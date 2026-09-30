@@ -3,6 +3,7 @@
 namespace App\Concerns;
 
 use App\Enums\WebhookEndpointMode;
+use App\Models\WebhookEndpoint;
 use App\Rules\PublicHttpUrl;
 use Illuminate\Validation\Rule;
 
@@ -17,11 +18,14 @@ trait WebhookEndpointValidationRules
     }
 
     /**
+     * Relay and managed endpoints both have somewhere to forward to; only a
+     * receive-only endpoint may leave the destination empty.
+     *
      * @return array<int, mixed>
      */
     protected function destinationUrlRules(): array
     {
-        return ['required', 'string', 'max:2048', new PublicHttpUrl];
+        return ['nullable', 'required_unless:mode,capture', 'string', 'max:2048', new PublicHttpUrl];
     }
 
     /**
@@ -49,13 +53,41 @@ trait WebhookEndpointValidationRules
     }
 
     /**
-     * Optional on update: a blank value means "keep the current secret",
-     * since the existing value is never redisplayed for the user to re-paste.
+     * Optional on update: a blank value means "keep the current secret", since
+     * the existing value is never redisplayed for the user to re-paste. The
+     * exception is moving an endpoint to managed with nothing on file yet,
+     * which would leave it with nothing to verify incoming signatures against.
      *
      * @return array<int, mixed>
      */
     protected function providerSecretUpdateRules(): array
     {
-        return ['nullable', 'string', 'max:1024'];
+        return [
+            'nullable',
+            Rule::requiredIf(fn (): bool => $this->resolvesToManagedMode() && $this->storedProviderSecret() === null),
+            'string',
+            'max:1024',
+        ];
+    }
+
+    private function resolvesToManagedMode(): bool
+    {
+        $mode = $this->input('mode');
+
+        if (is_string($mode)) {
+            return $mode === WebhookEndpointMode::Managed->value;
+        }
+
+        $endpoint = $this->route('webhook_endpoint');
+
+        return $endpoint instanceof WebhookEndpoint
+            && $endpoint->mode === WebhookEndpointMode::Managed;
+    }
+
+    private function storedProviderSecret(): ?string
+    {
+        $endpoint = $this->route('webhook_endpoint');
+
+        return $endpoint instanceof WebhookEndpoint ? $endpoint->provider_secret : null;
     }
 }

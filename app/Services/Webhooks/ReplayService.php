@@ -2,6 +2,7 @@
 
 namespace App\Services\Webhooks;
 
+use App\Enums\WebhookEndpointMode;
 use App\Enums\WebhookEventStatus;
 use App\Exceptions\EventNotReplayableException;
 use App\Jobs\ForwardWebhookDeliveryJob;
@@ -46,6 +47,12 @@ class ReplayService
      */
     private function dispatchReplay(WebhookEvent $event, callable $recordAudit): void
     {
+        if ($event->webhookEndpoint->mode === WebhookEndpointMode::Capture) {
+            throw new EventNotReplayableException(
+                'This endpoint is receive-only, so there is nothing to forward.'
+            );
+        }
+
         if ($event->status !== WebhookEventStatus::Success) {
             throw new EventNotReplayableException(
                 'Only events that were successfully verified can be replayed.'

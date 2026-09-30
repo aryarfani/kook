@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\WebhookEndpointMode;
 use App\Enums\WebhookEventStatus;
 use App\Models\AuditLog;
 use App\Models\Project;
@@ -65,6 +66,27 @@ test('a failed event cannot be replayed', function () {
     $this->actingAs($user)->post("/events/{$event->id}/replay")->assertRedirect();
 
     expect(WebhookDelivery::where('event_id', $event->id)->count())->toBe(0);
+});
+
+test('an event from a receive-only endpoint cannot be replayed', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->for($user)->create();
+    $endpoint = WebhookEndpoint::factory()->for($project)->create([
+        'mode' => WebhookEndpointMode::Capture,
+        'destination_url' => null,
+    ]);
+    $event = WebhookEvent::factory()->create([
+        'webhook_endpoint_id' => $endpoint->id,
+        'project_id' => $project->id,
+        'status' => WebhookEventStatus::Success,
+    ]);
+
+    $this->actingAs($user)
+        ->post("/events/{$event->id}/replay")
+        ->assertRedirect();
+
+    expect(WebhookDelivery::where('event_id', $event->id)->count())->toBe(0);
+    expect(AuditLog::where('action', 'webhook_event.replayed')->count())->toBe(0);
 });
 
 test('replay is rate limited', function () {

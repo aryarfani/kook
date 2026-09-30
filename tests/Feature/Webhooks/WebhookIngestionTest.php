@@ -278,3 +278,23 @@ test('ingestion is rate limited per endpoint', function () {
     $this->postJson("/webhooks/{$endpoint->ingest_token}", ['n' => 'over-limit'])
         ->assertStatus(429);
 });
+
+test('a receive-only endpoint stores the event without forwarding it', function () {
+    Http::fake();
+
+    $endpoint = WebhookEndpoint::factory()->create([
+        'status' => WebhookEndpointStatus::Active,
+        'mode' => WebhookEndpointMode::Capture,
+        'destination_url' => null,
+    ]);
+
+    $this->postJson("/webhooks/{$endpoint->ingest_token}", ['event' => 'order.created'])
+        ->assertStatus(200);
+
+    expect(WebhookEvent::first())
+        ->status->toBe(WebhookEventStatus::Success)
+        ->signature_valid->toBeNull();
+
+    Http::assertNothingSent();
+    expect(WebhookDelivery::count())->toBe(0);
+});

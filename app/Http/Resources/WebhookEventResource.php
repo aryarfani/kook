@@ -37,6 +37,9 @@ class WebhookEventResource extends JsonResource
                 fn () => [
                     'id' => $this->webhookEndpoint->id,
                     'name' => $this->webhookEndpoint->name,
+                    // Lets the event page hide the replay action for a
+                    // receive-only endpoint, which has nowhere to forward to.
+                    'mode' => $this->webhookEndpoint->mode,
                 ],
             ),
         ];

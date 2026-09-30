@@ -149,3 +149,54 @@ test('an event response never exposes the raw signing material of its endpoint',
         ->missing('event.webhookEndpoint.provider_secret')
     );
 });
+
+test('the endpoint page exposes the event named in the query string for its pane', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->for($user)->create();
+    $endpoint = WebhookEndpoint::factory()->for($project)->create();
+    $event = WebhookEvent::factory()->create([
+        'webhook_endpoint_id' => $endpoint->id,
+        'project_id' => $project->id,
+    ]);
+    WebhookDelivery::factory()->for($event, 'event')->create(['attempt_number' => 1]);
+
+    $this->actingAs($user)
+        ->get("/webhook-endpoints/{$endpoint->id}?event={$event->id}")
+        ->assertInertia(fn ($page) => $page
+            ->component('webhook-endpoints/show')
+            ->where('selectedEvent.event.id', $event->id)
+            ->where('selectedEvent.event.raw_body', $event->raw_body)
+            ->has('selectedEvent.deliveries', 1)
+        );
+});
+
+test('the endpoint page ignores an event that belongs to another endpoint', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->for($user)->create();
+    $endpoint = WebhookEndpoint::factory()->for($project)->create();
+    $otherEndpoint = WebhookEndpoint::factory()->for($project)->create();
+    $otherEvent = WebhookEvent::factory()->create([
+        'webhook_endpoint_id' => $otherEndpoint->id,
+        'project_id' => $project->id,
+    ]);
+
+    $this->actingAs($user)
+        ->get("/webhook-endpoints/{$endpoint->id}?event={$otherEvent->id}")
+        ->assertInertia(fn ($page) => $page
+            ->component('webhook-endpoints/show')
+            ->where('selectedEvent', null)
+        );
+});
+
+test('the endpoint page ignores a malformed event id', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->for($user)->create();
+    $endpoint = WebhookEndpoint::factory()->for($project)->create();
+
+    $this->actingAs($user)
+        ->get("/webhook-endpoints/{$endpoint->id}?event=not-a-uuid")
+        ->assertInertia(fn ($page) => $page
+            ->component('webhook-endpoints/show')
+            ->where('selectedEvent', null)
+        );
+});
