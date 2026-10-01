@@ -229,7 +229,13 @@ export default function ProjectsShow({
                                 />
                             ) : (
                                 <div className="overflow-x-auto">
-                                    <table className="w-full min-w-[720px] text-sm">
+                                    <table
+                                        className={cn(
+                                            'w-full text-sm',
+                                            selectedEvent === null &&
+                                                'min-w-[720px]',
+                                        )}
+                                    >
                                         <thead>
                                             <tr className="border-b border-border text-left text-xs text-muted-foreground uppercase">
                                                 <th className="px-6 py-3 font-medium">
@@ -238,15 +244,19 @@ export default function ProjectsShow({
                                                 <th className="px-4 py-3 font-medium">
                                                     Endpoint
                                                 </th>
-                                                <th className="px-4 py-3 font-medium">
-                                                    Event
-                                                </th>
+                                                {selectedEvent === null && (
+                                                    <th className="px-4 py-3 font-medium">
+                                                        Event
+                                                    </th>
+                                                )}
                                                 <th className="px-4 py-3 font-medium">
                                                     Status
                                                 </th>
-                                                <th className="px-6 py-3 font-medium">
-                                                    Signature
-                                                </th>
+                                                {selectedEvent === null && (
+                                                    <th className="px-6 py-3 font-medium">
+                                                        Signature
+                                                    </th>
+                                                )}
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-border">
@@ -325,10 +335,13 @@ export default function ProjectsShow({
                                                                 }
                                                             </Link>
                                                         </td>
-                                                        <td className="px-4 py-3 font-mono text-xs">
-                                                            {event.event_name ??
-                                                                'n/a'}
-                                                        </td>
+                                                        {selectedEvent ===
+                                                            null && (
+                                                            <td className="px-4 py-3 font-mono text-xs">
+                                                                {event.event_name ??
+                                                                    'n/a'}
+                                                            </td>
+                                                        )}
                                                         <td className="px-4 py-3">
                                                             <StatusChip
                                                                 tone={
@@ -341,14 +354,17 @@ export default function ProjectsShow({
                                                                 {event.status}
                                                             </StatusChip>
                                                         </td>
-                                                        <td className="px-6 py-3 text-muted-foreground">
-                                                            {event.signature_valid ===
-                                                            null
-                                                                ? 'n/a'
-                                                                : event.signature_valid
-                                                                  ? 'valid'
-                                                                  : 'invalid'}
-                                                        </td>
+                                                        {selectedEvent ===
+                                                            null && (
+                                                            <td className="px-6 py-3 text-muted-foreground">
+                                                                {event.signature_valid ===
+                                                                null
+                                                                    ? 'n/a'
+                                                                    : event.signature_valid
+                                                                      ? 'valid'
+                                                                      : 'invalid'}
+                                                            </td>
+                                                        )}
                                                     </tr>
                                                 );
                                             })}
