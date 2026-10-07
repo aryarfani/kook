@@ -52,11 +52,10 @@ test('an owner can export every event for their endpoint as json', function () {
             'idempotency_key',
             'headers',
             'payload',
-            'raw_body',
         ]);
 });
 
-test('the export contains the payload, headers and raw body of each event', function () {
+test('the export contains payload and headers but omits the raw body', function () {
     $user = User::factory()->create();
     $project = Project::factory()->for($user)->create();
     $endpoint = WebhookEndpoint::factory()->for($project)->create();
@@ -74,9 +73,26 @@ test('the export contains the payload, headers and raw body of each event', func
     $exported = exportedEvents($this->actingAs($user)->get(exportUri($endpoint)));
 
     expect($exported)->toHaveCount(1)
-        ->and($exported[0]['raw_body'])->toBe($rawBody)
+        ->and($exported[0])->not->toHaveKey('raw_body')
+        ->and($exported[0]['payload'])->toBe(['z_last' => 1, 'a_first' => ['nested' => true]])
         ->and($exported[0]['status'])->toBe('success')
         ->and($exported[0]['headers']['x-custom'])->toBe('yes');
+});
+
+test('browsing does not block downloads and repeated exports are not throttled', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->for($user)->create();
+    $endpoint = WebhookEndpoint::factory()->for($project)->create();
+
+    $this->actingAs($user);
+
+    for ($i = 0; $i < 10; $i++) {
+        $this->get("/webhook-endpoints/{$endpoint->id}")->assertOk();
+    }
+
+    for ($i = 0; $i < 12; $i++) {
+        $this->get(exportUri($endpoint))->assertOk();
+    }
 });
 
 test('an owner cannot export events belonging to another endpoint', function () {
