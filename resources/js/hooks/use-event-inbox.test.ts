@@ -122,12 +122,10 @@ test('failed loads keep existing events and allow a retry', async () => {
 test('explicit refresh resets appended rows even when the first page is unchanged', async () => {
     vi.stubGlobal(
         'fetch',
-        vi
-            .fn()
-            .mockResolvedValue({
-                ok: true,
-                json: async () => ({ props: { events: page(['c'], 2) } }),
-            }),
+        vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ props: { events: page(['c'], 2) } }),
+        }),
     );
     const initial = page(['a', 'b']);
     const { result } = renderHook(() => useEventInbox(initial, filters));
