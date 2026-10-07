@@ -1,7 +1,6 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { Pagination } from '@/components/pagination';
 import { EventsWorkspace } from '@/components/webhook-events/events-workspace';
-import { eventPagination } from '@/lib/event-pagination';
+import { useEventInbox } from '@/hooks/use-event-inbox';
 import type { EventFilters, EventsPageProps } from '@/types/event-workspace';
 
 export default function EventsIndex(props: EventsPageProps) {
@@ -9,6 +8,7 @@ export default function EventsIndex(props: EventsPageProps) {
         url,
         props: { errors },
     } = usePage();
+    const inbox = useEventInbox(props.events, props.filters);
     function visit(filters: EventFilters, event?: string, partial = false) {
         const query: Record<string, string> = Object.fromEntries(
             Object.entries(filters).filter(([, value]) => value !== ''),
@@ -23,7 +23,7 @@ export default function EventsIndex(props: EventsPageProps) {
         }
 
         router.get('/events', query, {
-            preserveScroll: true,
+            preserveScroll: partial,
             preserveState: true,
             replace: true,
             ...(partial ? { only: ['selectedEvent'] } : {}),
@@ -56,18 +56,20 @@ export default function EventsIndex(props: EventsPageProps) {
                     router.get(
                         url,
                         {},
-                        { preserveScroll: true, preserveState: true },
+                        {
+                            preserveScroll: false,
+                            preserveState: true,
+                            onSuccess: inbox.reset,
+                        },
                     )
                 }
                 onDownload={download}
-                pagination={
-                    <Pagination
-                        paginator={eventPagination(
-                            props.events,
-                            props.selectedEvent?.event.id,
-                        )}
-                    />
-                }
+                events={inbox.events}
+                inboxRevision={inbox.revision}
+                onLoadMore={inbox.loadMore}
+                hasMore={inbox.hasMore}
+                loadingMore={inbox.loading}
+                loadError={inbox.error}
             />
         </>
     );

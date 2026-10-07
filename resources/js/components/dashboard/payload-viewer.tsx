@@ -1,6 +1,7 @@
 import { Copy01Icon, Tick01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { useClipboard } from '@/hooks/use-clipboard';
 import { highlightJson } from '@/lib/json-highlight';
@@ -9,9 +10,11 @@ import { cn } from '@/lib/utils';
 export function PayloadViewer({
     raw,
     expanded = false,
+    controlsContainer,
 }: {
     raw: string;
     expanded?: boolean;
+    controlsContainer?: Element | null;
 }) {
     const [copiedText, copy] = useClipboard();
     const [formatted, setFormatted] = useState(true);
@@ -63,31 +66,41 @@ export function PayloadViewer({
         </Button>
     );
 
+    const controls = (
+        <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-2">
+                <input
+                    type="checkbox"
+                    checked={formatted}
+                    disabled={!segments}
+                    onChange={(e) => setFormatted(e.target.checked)}
+                    className="accent-signal"
+                />
+                Format JSON
+            </label>
+            <label className="flex items-center gap-2">
+                <input
+                    type="checkbox"
+                    checked={wrap}
+                    onChange={(e) => setWrap(e.target.checked)}
+                    className="accent-signal"
+                />
+                Wrap
+            </label>
+            {copyButton}
+        </div>
+    );
+
     return (
         <div className={expanded ? 'flex min-h-0 flex-1 flex-col' : 'relative'}>
             {expanded ? (
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-4 border-b border-border px-5 py-2 text-xs text-muted-foreground">
-                    <label className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            checked={formatted}
-                            disabled={!segments}
-                            onChange={(e) => setFormatted(e.target.checked)}
-                            className="accent-signal"
-                        />
-                        Format JSON
-                    </label>
-                    <label className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            checked={wrap}
-                            onChange={(e) => setWrap(e.target.checked)}
-                            className="accent-signal"
-                        />
-                        Wrap
-                    </label>
-                    {copyButton}
-                </div>
+                controlsContainer ? (
+                    createPortal(controls, controlsContainer)
+                ) : (
+                    <div className="flex justify-end border-b border-border px-5 py-2 text-xs text-muted-foreground">
+                        {controls}
+                    </div>
+                )
             ) : (
                 copyButton
             )}

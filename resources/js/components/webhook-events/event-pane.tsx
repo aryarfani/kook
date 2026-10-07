@@ -28,6 +28,8 @@ export function EventPane({
     onClose: () => void;
     source?: string;
 }) {
+    const [payloadControls, setPayloadControls] =
+        useState<HTMLDivElement | null>(null);
     const [tab, setTab] = useState('Payload');
     const [copied, copy] = useClipboard();
     const latest = deliveries.reduce<WebhookDelivery | null>(
@@ -52,17 +54,6 @@ export function EventPane({
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        {event.status === 'success' &&
-                            endpointMode !== 'capture' && (
-                                <ReplayEventButton event={event} />
-                            )}
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => copy(event.id)}
-                        >
-                            {copied === event.id ? 'Copied' : 'Copy event ID'}
-                        </Button>
                         <Button
                             variant="ghost"
                             size="icon"
@@ -77,7 +68,7 @@ export function EventPane({
                         </Button>
                     </div>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3 border-y border-border py-3 text-xs">
+                <div className="mt-4 flex flex-wrap items-center gap-x-8 gap-y-3 border-y border-border py-2 text-xs">
                     <div className="flex items-center gap-2">
                         <span className="text-muted-foreground">Ingestion</span>
                         <StatusChip tone={eventStatusTone[event.status]}>
@@ -98,60 +89,79 @@ export function EventPane({
                         Relay Status:{' '}
                         {relayStatus(endpointMode, event.status, latest)}
                     </p>
+                    <div className="ml-auto flex items-center gap-2">
+                        {event.status === 'success' &&
+                            endpointMode !== 'capture' && (
+                                <ReplayEventButton event={event} />
+                            )}
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => copy(event.id)}
+                        >
+                            {copied === event.id ? 'Copied' : 'Copy event ID'}
+                        </Button>
+                    </div>
                 </div>
             </div>
-            <div
-                role="tablist"
-                aria-label="Event data"
-                className="flex shrink-0 gap-6 border-b border-border px-5"
-            >
-                {['Payload', 'Headers', 'Delivery attempts'].map((name) => (
-                    <button
-                        key={name}
-                        id={`event-tab-${name.replaceAll(' ', '-')}`}
-                        role="tab"
-                        tabIndex={tab === name ? 0 : -1}
-                        aria-selected={tab === name}
-                        aria-controls="event-data-panel"
-                        onClick={() => setTab(name)}
-                        onKeyDown={(e) => {
-                            const names = [
-                                'Payload',
-                                'Headers',
-                                'Delivery attempts',
-                            ];
-                            const index = names.indexOf(name);
-                            const next =
-                                e.key === 'ArrowRight'
-                                    ? (index + 1) % 3
-                                    : e.key === 'ArrowLeft'
-                                      ? (index + 2) % 3
-                                      : e.key === 'Home'
-                                        ? 0
-                                        : e.key === 'End'
-                                          ? 2
-                                          : null;
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 border-b border-border px-5">
+                <div
+                    role="tablist"
+                    aria-label="Event data"
+                    className="flex shrink-0 gap-6"
+                >
+                    {['Payload', 'Headers', 'Delivery attempts'].map((name) => (
+                        <button
+                            key={name}
+                            id={`event-tab-${name.replaceAll(' ', '-')}`}
+                            role="tab"
+                            tabIndex={tab === name ? 0 : -1}
+                            aria-selected={tab === name}
+                            aria-controls="event-data-panel"
+                            onClick={() => setTab(name)}
+                            onKeyDown={(e) => {
+                                const names = [
+                                    'Payload',
+                                    'Headers',
+                                    'Delivery attempts',
+                                ];
+                                const index = names.indexOf(name);
+                                const next =
+                                    e.key === 'ArrowRight'
+                                        ? (index + 1) % 3
+                                        : e.key === 'ArrowLeft'
+                                          ? (index + 2) % 3
+                                          : e.key === 'Home'
+                                            ? 0
+                                            : e.key === 'End'
+                                              ? 2
+                                              : null;
 
-                            if (next !== null) {
-                                e.preventDefault();
-                                setTab(names[next]);
-                                e.currentTarget.parentElement
-                                    ?.querySelectorAll<HTMLButtonElement>(
-                                        '[role="tab"]',
-                                    )
-                                    [next]?.focus();
-                            }
-                        }}
-                        className={cn(
-                            'border-b-2 border-transparent py-3 text-sm text-muted-foreground hover:text-foreground',
-                            tab === name && 'border-signal text-signal',
-                        )}
-                    >
-                        {name}
-                        {name === 'Delivery attempts' &&
-                            ` (${deliveries.length})`}
-                    </button>
-                ))}
+                                if (next !== null) {
+                                    e.preventDefault();
+                                    setTab(names[next]);
+                                    e.currentTarget.parentElement
+                                        ?.querySelectorAll<HTMLButtonElement>(
+                                            '[role="tab"]',
+                                        )
+                                        [next]?.focus();
+                                }
+                            }}
+                            className={cn(
+                                'border-b-2 border-transparent py-3 text-sm text-muted-foreground hover:text-foreground',
+                                tab === name && 'border-signal text-signal',
+                            )}
+                        >
+                            {name}
+                            {name === 'Delivery attempts' &&
+                                ` (${deliveries.length})`}
+                        </button>
+                    ))}
+                </div>
+                <div
+                    ref={setPayloadControls}
+                    className="ml-auto flex items-center gap-4 py-2 text-xs text-muted-foreground"
+                />
             </div>
             <div
                 id="event-data-panel"
@@ -160,7 +170,11 @@ export function EventPane({
                 className="flex min-h-0 flex-1 flex-col"
             >
                 {tab === 'Payload' && (
-                    <PayloadViewer raw={event.raw_body} expanded />
+                    <PayloadViewer
+                        raw={event.raw_body}
+                        expanded
+                        controlsContainer={payloadControls}
+                    />
                 )}
                 {tab === 'Headers' && (
                     <dl className="min-h-0 overflow-auto px-5 py-3 font-mono text-xs">

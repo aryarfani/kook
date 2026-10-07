@@ -1,5 +1,6 @@
 import { Download01Icon, RefreshIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
+import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { EventPane } from '@/components/webhook-events/event-pane';
 import { toLocalIso } from '@/lib/export-date';
@@ -13,7 +14,11 @@ export type EventsWorkspaceProps = EventsPageProps & {
     onClose: () => void;
     onDownload: () => void;
     onRefresh: () => void;
-    pagination?: React.ReactNode;
+    onLoadMore?: () => void;
+    hasMore?: boolean;
+    loadingMore?: boolean;
+    loadError?: string;
+    inboxRevision?: number;
 };
 
 function calendarDate(value: string, end: boolean): string {
@@ -44,8 +49,38 @@ export function EventsWorkspace({
     onClose,
     onDownload,
     onRefresh,
-    pagination,
+    onLoadMore,
+    hasMore = false,
+    loadingMore = false,
+    loadError = '',
+    inboxRevision = 0,
 }: EventsWorkspaceProps) {
+    const listRef = useRef<HTMLDivElement>(null);
+    const sentinelRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (
+            !hasMore ||
+            loadingMore ||
+            loadError ||
+            !onLoadMore ||
+            !sentinelRef.current ||
+            !listRef.current
+        ) {
+            return;
+        }
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    onLoadMore();
+                }
+            },
+            { root: listRef.current, rootMargin: '160px' },
+        );
+        observer.observe(sentinelRef.current);
+
+        return () => observer.disconnect();
+    }, [hasMore, loadingMore, loadError, onLoadMore]);
     const filteredEndpoints = endpoints.filter(
         (endpoint) =>
             !filters.project || endpoint.project_id === filters.project,
@@ -233,7 +268,11 @@ export function EventsWorkspace({
                             Newest first
                         </p>
                     </div>
-                    <div className="min-h-0 flex-1 overflow-y-auto">
+                    <div
+                        key={inboxRevision}
+                        ref={listRef}
+                        className="min-h-0 flex-1 overflow-y-auto"
+                    >
                         {events.data.map((event) => (
                             <button
                                 key={event.id}
@@ -299,12 +338,28 @@ export function EventsWorkspace({
                                 No events match these filters.
                             </p>
                         )}
-                    </div>
-                    <div className="shrink-0 space-y-2 border-t border-border px-3 py-3 text-xs text-muted-foreground">
-                        <p>
-                            Page {events.current_page} of {events.last_page}
-                        </p>
-                        {pagination}
+                        <div
+                            ref={sentinelRef}
+                            className="px-4 py-3 text-xs text-muted-foreground"
+                            aria-live="polite"
+                        >
+                            {loadingMore ? (
+                                'Loading more events…'
+                            ) : loadError ? (
+                                <>
+                                    <p>{loadError}</p>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={onLoadMore}
+                                    >
+                                        Retry
+                                    </Button>
+                                </>
+                            ) : events.data.length > 0 && !hasMore ? (
+                                'All matching events loaded.'
+                            ) : null}
+                        </div>
                     </div>
                 </section>
                 <section
