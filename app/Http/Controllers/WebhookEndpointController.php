@@ -117,7 +117,6 @@ class WebhookEndpointController extends Controller
                         'idempotency_key' => $event->idempotency_key,
                         'headers' => $event->headers,
                         'payload' => $event->payload,
-                        'raw_body' => $event->raw_body,
                     ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE));
 
                     $first = false;
