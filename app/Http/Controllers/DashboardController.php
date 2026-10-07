@@ -17,7 +17,6 @@ class DashboardController extends Controller
 
         return Inertia::render('dashboard', [
             'stats' => $this->dashboard->statsForUser($user),
-            'recentEvents' => $this->dashboard->recentEventsForUser($user),
         ]);
     }
 }

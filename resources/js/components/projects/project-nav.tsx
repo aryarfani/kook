@@ -17,6 +17,10 @@ import type { Project } from '@/types';
 export type ProjectNavTab = 'endpoints' | 'events' | 'api-keys' | 'settings';
 
 function tabHref(project: Project, tab: ProjectNavTab) {
+    if (tab === 'events') {
+        return `/events?project=${encodeURIComponent(project.id)}`;
+    }
+
     return showProject(project, { query: { tab } });
 }
 
@@ -112,7 +116,7 @@ export function ProjectNav({
                             tab="events"
                             active={active === 'events'}
                         >
-                            Events
+                            View events
                         </NavTab>
                         <NavTab
                             project={project}

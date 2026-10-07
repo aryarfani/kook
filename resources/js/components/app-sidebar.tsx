@@ -1,4 +1,5 @@
 import {
+    Activity01Icon,
     FileSecurityIcon,
     Folder02Icon,
     Home01Icon,
@@ -28,6 +29,12 @@ const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: dashboard(),
         icon: Home01Icon,
+    },
+    {
+        title: 'Events',
+        href: '/events',
+        icon: Activity01Icon,
+        matchPrefix: true,
     },
     {
         title: 'Projects',

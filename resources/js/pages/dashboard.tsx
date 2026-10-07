@@ -7,12 +7,8 @@ import {
 import { Head, Link } from '@inertiajs/react';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { StatCard } from '@/components/dashboard/stat-card';
-import { StatusChip } from '@/components/dashboard/status-chip';
-import { eventStatusTone } from '@/lib/status-tones';
+import { Button } from '@/components/ui/button';
 import { dashboard } from '@/routes';
-import { index as projectsIndex } from '@/routes/projects';
-import { show as showEvent } from '@/routes/webhook-events';
-import type { WebhookEventStatus } from '@/types';
 
 type DashboardStats = {
     projects: number;
@@ -21,20 +17,7 @@ type DashboardStats = {
     failedEventsLast24h: number;
 };
 
-type RecentEvent = {
-    id: string;
-    status: WebhookEventStatus;
-    received_at: string;
-    webhookEndpoint: { id: string; name: string };
-};
-
-export default function Dashboard({
-    stats,
-    recentEvents,
-}: {
-    stats: DashboardStats;
-    recentEvents: RecentEvent[];
-}) {
+export default function Dashboard({ stats }: { stats: DashboardStats }) {
     return (
         <>
             <Head title="Dashboard" />
@@ -68,51 +51,14 @@ export default function Dashboard({
                     />
                 </div>
 
-                <div className="rounded-2xl border border-border bg-card">
-                    <div className="border-b border-border px-6 py-4">
-                        <h2 className="font-semibold">Recent events</h2>
-                    </div>
-
-                    {recentEvents.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
-                            <p className="text-sm text-muted-foreground">
-                                No webhook events yet.
-                            </p>
-                            <Link
-                                href={projectsIndex()}
-                                className="text-sm font-medium text-signal hover:underline"
-                            >
-                                Create a project to get started
-                            </Link>
-                        </div>
-                    ) : (
-                        <div className="divide-y divide-border">
-                            {recentEvents.map((event) => (
-                                <Link
-                                    key={event.id}
-                                    href={showEvent(event)}
-                                    className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 transition-colors hover:bg-accent/50"
-                                    data-test={`recent-event-${event.id}`}
-                                >
-                                    <div className="min-w-0">
-                                        <p className="truncate font-medium">
-                                            {event.webhookEndpoint.name}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {new Date(
-                                                event.received_at,
-                                            ).toLocaleString()}
-                                        </p>
-                                    </div>
-                                    <StatusChip
-                                        tone={eventStatusTone[event.status]}
-                                    >
-                                        {event.status}
-                                    </StatusChip>
-                                </Link>
-                            ))}
-                        </div>
-                    )}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
+                    <p className="text-sm text-muted-foreground">
+                        Browse received events and inspect their payloads in
+                        Events.
+                    </p>
+                    <Button variant="outline" asChild>
+                        <Link href="/events">View events</Link>
+                    </Button>
                 </div>
             </div>
         </>

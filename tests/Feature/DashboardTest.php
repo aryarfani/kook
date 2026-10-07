@@ -57,7 +57,7 @@ class DashboardTest extends TestCase
             ->where('stats.webhookEndpoints', 1)
             ->where('stats.eventsLast24h', 1)
             ->where('stats.failedEventsLast24h', 1)
-            ->has('recentEvents', 1)
+            ->missing('recentEvents')
         );
     }
 }

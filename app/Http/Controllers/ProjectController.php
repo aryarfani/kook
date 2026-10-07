@@ -5,18 +5,13 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Projects\DestroyProjectRequest;
 use App\Http\Requests\Projects\StoreProjectRequest;
 use App\Http\Requests\Projects\UpdateProjectRequest;
-use App\Http\Resources\WebhookDeliveryResource;
-use App\Http\Resources\WebhookEventResource;
 use App\Models\Project;
-use App\Models\WebhookEvent;
 use App\Services\ApiKeyService;
 use App\Services\ProjectService;
 use App\Services\ProviderCatalogService;
 use App\Services\WebhookEndpointService;
-use App\Services\WebhookEventService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -27,7 +22,6 @@ class ProjectController extends Controller
         private readonly WebhookEndpointService $endpoints,
         private readonly ProviderCatalogService $providers,
         private readonly ApiKeyService $apiKeys,
-        private readonly WebhookEventService $events,
     ) {}
 
     public function index(Request $request): Response
@@ -37,12 +31,21 @@ class ProjectController extends Controller
         ]);
     }
 
-    public function show(Request $request, Project $project): Response
+    public function show(Request $request, Project $project): Response|RedirectResponse
     {
         abort_unless($request->user()->can('view', $project), 404);
 
         $tab = $request->query('tab');
-        $selectedEvent = $this->selectedEvent($request, $project);
+
+        if ($tab === 'events' || $request->has('event')) {
+            $parameters = ['project' => $project->id];
+
+            if ($request->has('event')) {
+                $parameters['event'] = $request->query('event');
+            }
+
+            return to_route('webhook-events.index', $parameters);
+        }
 
         return Inertia::render('projects/show', [
             'project' => $project,
@@ -50,17 +53,7 @@ class ProjectController extends Controller
             'webhookEndpoints' => $this->endpoints->listForProject($project),
             'providers' => $this->providers->active(),
             'apiKeys' => $this->apiKeys->listForProject($project),
-            'events' => $this->events->listForProject($project),
-            'activeTab' => in_array($tab, ['endpoints', 'events', 'api-keys', 'settings'], true) ? $tab : 'endpoints',
-            // Drives the side-by-side pane on the events tab. Opening an event
-            // is a partial reload of just this prop, so the list beside it
-            // never re-renders.
-            'selectedEvent' => $selectedEvent === null ? null : [
-                'event' => (new WebhookEventResource($selectedEvent))->resolve($request),
-                'deliveries' => WebhookDeliveryResource::collection(
-                    $this->events->deliveriesFor($selectedEvent)
-                )->toArray($request),
-            ],
+            'activeTab' => in_array($tab, ['endpoints', 'api-keys', 'settings'], true) ? $tab : 'endpoints',
         ]);
     }
 
@@ -88,26 +81,5 @@ class ProjectController extends Controller
         $this->projects->delete($request->user(), $project);
 
         return to_route('projects.index');
-    }
-
-    /**
-     * The event the events tab should show in its pane, scoped to this project
-     * so a foreign id resolves to nothing rather than someone else's event. A
-     * malformed id is ignored outright - querying a uuid column with it would
-     * error. The endpoint comes along because the pane needs its mode to know
-     * whether the event can be replayed.
-     */
-    private function selectedEvent(Request $request, Project $project): ?WebhookEvent
-    {
-        $eventId = $request->query('event');
-
-        if (! is_string($eventId) || ! Str::isUuid($eventId)) {
-            return null;
-        }
-
-        return $project->events()
-            ->with('webhookEndpoint')
-            ->whereKey($eventId)
-            ->first();
     }
 }

@@ -1,15 +1,13 @@
 import { ArrowLeft01Icon, Refresh01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Form, Head, Link, router } from '@inertiajs/react';
+import { Form, Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
-import type { MouseEvent, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import WebhookEndpointController from '@/actions/App/Http/Controllers/WebhookEndpointController';
 import { CopyField } from '@/components/copy-field';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { StatusChip } from '@/components/dashboard/status-chip';
 import InputError from '@/components/input-error';
-import { Pagination } from '@/components/pagination';
-import { EmptyState } from '@/components/projects/empty-state';
 import { ProjectNav } from '@/components/projects/project-nav';
 import { ProviderLogo } from '@/components/providers/provider-logo';
 import { Button } from '@/components/ui/button';
@@ -32,24 +30,15 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { DeleteEndpointDialog } from '@/components/webhook-endpoints/delete-endpoint-dialog';
-import { ExportEventsDialog } from '@/components/webhook-endpoints/export-events-dialog';
-import { EventPane } from '@/components/webhook-events/event-pane';
 import { endpointHealth } from '@/lib/endpoint-health';
 import { providerSecretGuidance } from '@/lib/provider-secret-guidance';
-import { endpointStatusTone, eventStatusTone } from '@/lib/status-tones';
-import { cn } from '@/lib/utils';
+import { endpointStatusTone } from '@/lib/status-tones';
 import { show as showProject } from '@/routes/projects';
-import { show as showEndpoint } from '@/routes/webhook-endpoints';
-import { show as showEvent } from '@/routes/webhook-events';
 import type {
-    Paginated,
     Project,
     Provider,
-    WebhookDelivery,
     WebhookEndpoint,
     WebhookEndpointMode,
-    WebhookEvent,
-    WebhookEventDetail,
 } from '@/types';
 
 function Section({
@@ -78,18 +67,11 @@ export default function WebhookEndpointsShow({
     projects,
     providers,
     webhookEndpoint,
-    events,
-    selectedEvent,
 }: {
     project: Project;
     projects: Project[];
     providers: Provider[];
     webhookEndpoint: WebhookEndpoint;
-    events: Paginated<WebhookEvent>;
-    selectedEvent: {
-        event: WebhookEventDetail;
-        deliveries: WebhookDelivery[];
-    } | null;
 }) {
     const [ingestUrl] = useState(
         () =>
@@ -101,58 +83,6 @@ export default function WebhookEndpointsShow({
     const secretGuidance = providerSecretGuidance(
         webhookEndpoint.provider?.key,
     );
-
-    const showEventInPane = (
-        clickEvent: MouseEvent<Element>,
-        event: WebhookEvent,
-    ) => {
-        // Below lg there is no room for a side-by-side pane, so the row link
-        // is left alone and navigates to the standalone event page. Modifier
-        // clicks stay untouched everywhere so they can still open a new tab.
-        if (!window.matchMedia('(min-width: 1024px)').matches) {
-            return;
-        }
-
-        if (
-            clickEvent.metaKey ||
-            clickEvent.ctrlKey ||
-            clickEvent.shiftKey ||
-            clickEvent.altKey ||
-            clickEvent.button !== 0
-        ) {
-            return;
-        }
-
-        clickEvent.preventDefault();
-
-        const isSelected = selectedEvent?.event.id === event.id;
-
-        router.get(
-            isSelected
-                ? showEndpoint(webhookEndpoint)
-                : showEndpoint(webhookEndpoint, { query: { event: event.id } }),
-            {},
-            {
-                only: ['selectedEvent'],
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-            },
-        );
-    };
-
-    const closeEventPane = () => {
-        router.get(
-            showEndpoint(webhookEndpoint),
-            {},
-            {
-                only: ['selectedEvent'],
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-            },
-        );
-    };
 
     return (
         <>
@@ -483,116 +413,17 @@ export default function WebhookEndpointsShow({
                     </Section>
                 )}
 
-                <div
-                    className={cn(
-                        selectedEvent !== null &&
-                            'grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]',
-                    )}
-                >
-                    <div className="rounded-2xl border border-border bg-card">
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-4">
-                            <div>
-                                <h2 className="font-semibold">Events</h2>
-                                <p className="text-sm text-muted-foreground">
-                                    {events.total} received in total
-                                </p>
-                            </div>
-                            <ExportEventsDialog
-                                webhookEndpoint={webhookEndpoint}
-                            />
-                        </div>
-
-                        {events.data.length === 0 ? (
-                            <EmptyState
-                                title="No events yet"
-                                description="Once this endpoint receives a webhook, it will show up here."
-                            />
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b border-border text-left text-xs text-muted-foreground uppercase">
-                                            <th className="px-6 py-3 font-medium">
-                                                Received
-                                            </th>
-                                            <th className="px-4 py-3 font-medium">
-                                                Event
-                                            </th>
-                                            <th className="px-6 py-3 font-medium">
-                                                Status
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border">
-                                        {events.data.map((event) => {
-                                            const isSelected =
-                                                selectedEvent?.event.id ===
-                                                event.id;
-
-                                            return (
-                                                <Link
-                                                    key={event.id}
-                                                    as="tr"
-                                                    href={showEvent(event)}
-                                                    onClick={(clickEvent) =>
-                                                        showEventInPane(
-                                                            clickEvent,
-                                                            event,
-                                                        )
-                                                    }
-                                                    aria-current={
-                                                        isSelected
-                                                            ? 'true'
-                                                            : undefined
-                                                    }
-                                                    className={cn(
-                                                        'cursor-pointer transition-colors hover:bg-accent/50',
-                                                        isSelected &&
-                                                            'bg-accent/50',
-                                                    )}
-                                                    data-test={`event-link-${event.id}`}
-                                                >
-                                                    <td className="px-6 py-3 whitespace-nowrap">
-                                                        {new Date(
-                                                            event.received_at,
-                                                        ).toLocaleString()}
-                                                    </td>
-                                                    <td className="max-w-[18rem] truncate px-4 py-3 font-mono text-xs">
-                                                        {event.event_name ??
-                                                            'n/a'}
-                                                    </td>
-                                                    <td className="px-6 py-3">
-                                                        <StatusChip
-                                                            tone={
-                                                                eventStatusTone[
-                                                                    event.status
-                                                                ]
-                                                            }
-                                                        >
-                                                            {event.status}
-                                                        </StatusChip>
-                                                    </td>
-                                                </Link>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-
-                        <div className="px-6 py-4">
-                            <Pagination paginator={events} />
-                        </div>
-                    </div>
-
-                    {selectedEvent && (
-                        <EventPane
-                            event={selectedEvent.event}
-                            deliveries={selectedEvent.deliveries}
-                            endpointMode={webhookEndpoint.mode}
-                            onClose={closeEventPane}
-                        />
-                    )}
+                <div className="flex items-center justify-between gap-4 border-t border-border pt-5">
+                    <p className="text-sm text-muted-foreground">
+                        Browse this endpoint's activity in Events.
+                    </p>
+                    <Button variant="outline" asChild>
+                        <Link
+                            href={`/events?endpoint=${encodeURIComponent(webhookEndpoint.id)}`}
+                        >
+                            View events
+                        </Link>
+                    </Button>
                 </div>
             </div>
         </>

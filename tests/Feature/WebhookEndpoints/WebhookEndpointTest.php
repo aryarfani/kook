@@ -104,7 +104,7 @@ test('a user can view their own webhook endpoint', function () {
             ->component('webhook-endpoints/show')
             ->where('webhookEndpoint.id', $endpoint->id)
             ->where('webhookEndpoint.latest_event', null)
-            ->has('events.data', 0)
+            ->missing('events')
             ->has('projects', 1)
             ->where('projects.0.id', $project->id)
         );

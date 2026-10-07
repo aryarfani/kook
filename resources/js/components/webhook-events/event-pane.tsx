@@ -4,6 +4,7 @@ import { StatusChip } from '@/components/dashboard/status-chip';
 import { Button } from '@/components/ui/button';
 import { EventDetailSections } from '@/components/webhook-events/event-detail-sections';
 import { ReplayEventButton } from '@/components/webhook-events/replay-event-button';
+import { relayStatus } from '@/lib/relay-status';
 import { eventStatusTone } from '@/lib/status-tones';
 import type {
     WebhookDelivery,
@@ -22,6 +23,14 @@ export function EventPane({
     endpointMode: WebhookEndpointMode;
     onClose: () => void;
 }) {
+    const latestDelivery = deliveries.reduce<WebhookDelivery | null>(
+        (latest, delivery) =>
+            !latest || delivery.attempt_number > latest.attempt_number
+                ? delivery
+                : latest,
+        null,
+    );
+
     return (
         <div
             className="space-y-6 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1"
@@ -54,6 +63,14 @@ export function EventPane({
                                 </StatusChip>
                             )}
                         </div>
+                        <p className="mt-3 text-xs text-muted-foreground">
+                            Relay Status:{' '}
+                            {relayStatus(
+                                endpointMode,
+                                event.status,
+                                latestDelivery,
+                            )}
+                        </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                         {event.status === 'success' &&

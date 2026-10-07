@@ -1,10 +1,8 @@
-import { Form, Head, Link, router } from '@inertiajs/react';
-import type { MouseEvent } from 'react';
+import { Form, Head, Link } from '@inertiajs/react';
 import ProjectController from '@/actions/App/Http/Controllers/ProjectController';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { StatusChip } from '@/components/dashboard/status-chip';
 import InputError from '@/components/input-error';
-import { Pagination } from '@/components/pagination';
 import { ApiKeysCard } from '@/components/projects/api-keys-card';
 import { CreateEndpointDialog } from '@/components/projects/create-endpoint-dialog';
 import { DeleteProjectDialog } from '@/components/projects/delete-project-dialog';
@@ -15,27 +13,10 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { EventPane } from '@/components/webhook-events/event-pane';
 import { endpointHealth } from '@/lib/endpoint-health';
-import { endpointStatusTone, eventStatusTone } from '@/lib/status-tones';
-import { cn } from '@/lib/utils';
-import { show as showProject } from '@/routes/projects';
+import { endpointStatusTone } from '@/lib/status-tones';
 import { show as showEndpoint } from '@/routes/webhook-endpoints';
-import { show as showEvent } from '@/routes/webhook-events';
-import type {
-    ApiKey,
-    Paginated,
-    Project,
-    Provider,
-    WebhookDelivery,
-    WebhookEndpoint,
-    WebhookEvent,
-    WebhookEventWithEndpoint,
-} from '@/types';
-
-type ProjectEvent = WebhookEvent & {
-    webhook_endpoint: { id: string; name: string };
-};
+import type { ApiKey, Project, Provider, WebhookEndpoint } from '@/types';
 
 export default function ProjectsShow({
     project,
@@ -43,76 +24,15 @@ export default function ProjectsShow({
     webhookEndpoints,
     providers,
     apiKeys,
-    events,
     activeTab,
-    selectedEvent,
 }: {
     project: Project;
     projects: Project[];
     webhookEndpoints: WebhookEndpoint[];
     providers: Provider[];
     apiKeys: ApiKey[];
-    events: Paginated<ProjectEvent>;
     activeTab: ProjectNavTab;
-    selectedEvent: {
-        event: WebhookEventWithEndpoint;
-        deliveries: WebhookDelivery[];
-    } | null;
 }) {
-    const showEventInPane = (
-        clickEvent: MouseEvent<Element>,
-        event: ProjectEvent,
-    ) => {
-        // Below lg there is no room for a side-by-side pane, so the links are
-        // left alone and navigate to the standalone event page. Modifier
-        // clicks stay untouched everywhere so they can still open a new tab.
-        if (!window.matchMedia('(min-width: 1024px)').matches) {
-            return;
-        }
-
-        if (
-            clickEvent.metaKey ||
-            clickEvent.ctrlKey ||
-            clickEvent.shiftKey ||
-            clickEvent.altKey ||
-            clickEvent.button !== 0
-        ) {
-            return;
-        }
-
-        clickEvent.preventDefault();
-
-        const isSelected = selectedEvent?.event.id === event.id;
-
-        router.get(
-            showProject(project, {
-                query: isSelected
-                    ? { tab: 'events' }
-                    : { tab: 'events', event: event.id },
-            }),
-            {},
-            {
-                only: ['selectedEvent'],
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-            },
-        );
-    };
-
-    const closeEventPane = () => {
-        router.get(
-            showProject(project, { query: { tab: 'events' } }),
-            {},
-            {
-                only: ['selectedEvent'],
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-            },
-        );
-    };
-
     return (
         <>
             <Head title={project.name} />
@@ -204,189 +124,6 @@ export default function ProjectsShow({
                                     })}
                                 </div>
                             </>
-                        )}
-                    </div>
-                )}
-
-                {activeTab === 'events' && (
-                    <div
-                        className={cn(
-                            selectedEvent !== null &&
-                                'grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]',
-                        )}
-                    >
-                        <div className="rounded-2xl border border-border bg-card">
-                            <div className="border-b border-border px-6 py-4">
-                                <p className="text-sm text-muted-foreground">
-                                    {events.total} received across all endpoints
-                                </p>
-                            </div>
-
-                            {events.data.length === 0 ? (
-                                <EmptyState
-                                    title="No events yet"
-                                    description="Once one of this project's endpoints receives a webhook, it will show up here."
-                                />
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table
-                                        className={cn(
-                                            'w-full text-sm',
-                                            selectedEvent === null &&
-                                                'min-w-[720px]',
-                                        )}
-                                    >
-                                        <thead>
-                                            <tr className="border-b border-border text-left text-xs text-muted-foreground uppercase">
-                                                <th className="px-6 py-3 font-medium">
-                                                    Received
-                                                </th>
-                                                <th className="px-4 py-3 font-medium">
-                                                    Endpoint
-                                                </th>
-                                                {selectedEvent === null && (
-                                                    <th className="px-4 py-3 font-medium">
-                                                        Event
-                                                    </th>
-                                                )}
-                                                <th className="px-4 py-3 font-medium">
-                                                    Status
-                                                </th>
-                                                {selectedEvent === null && (
-                                                    <th className="px-6 py-3 font-medium">
-                                                        Signature
-                                                    </th>
-                                                )}
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-border">
-                                            {events.data.map((event) => {
-                                                const isSelected =
-                                                    selectedEvent?.event.id ===
-                                                    event.id;
-
-                                                return (
-                                                    <tr
-                                                        key={event.id}
-                                                        onClick={(
-                                                            clickEvent,
-                                                        ) => {
-                                                            // A click that started
-                                                            // inside one of the
-                                                            // row's own links
-                                                            // belongs to that link.
-                                                            if (
-                                                                (
-                                                                    clickEvent.target as HTMLElement
-                                                                ).closest('a')
-                                                            ) {
-                                                                return;
-                                                            }
-
-                                                            showEventInPane(
-                                                                clickEvent,
-                                                                event,
-                                                            );
-                                                        }}
-                                                        aria-current={
-                                                            isSelected
-                                                                ? 'true'
-                                                                : undefined
-                                                        }
-                                                        className={cn(
-                                                            'cursor-pointer transition-colors hover:bg-accent/50',
-                                                            isSelected &&
-                                                                'bg-accent/50',
-                                                        )}
-                                                        data-test={`event-row-${event.id}`}
-                                                    >
-                                                        <td className="px-6 py-3 whitespace-nowrap">
-                                                            <Link
-                                                                href={showEvent(
-                                                                    event,
-                                                                )}
-                                                                onClick={(
-                                                                    clickEvent,
-                                                                ) =>
-                                                                    showEventInPane(
-                                                                        clickEvent,
-                                                                        event,
-                                                                    )
-                                                                }
-                                                                className="hover:underline"
-                                                                data-test={`event-link-${event.id}`}
-                                                            >
-                                                                {new Date(
-                                                                    event.received_at,
-                                                                ).toLocaleString()}
-                                                            </Link>
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            <Link
-                                                                href={showEndpoint(
-                                                                    event.webhook_endpoint,
-                                                                )}
-                                                                className="hover:underline"
-                                                            >
-                                                                {
-                                                                    event
-                                                                        .webhook_endpoint
-                                                                        .name
-                                                                }
-                                                            </Link>
-                                                        </td>
-                                                        {selectedEvent ===
-                                                            null && (
-                                                            <td className="px-4 py-3 font-mono text-xs">
-                                                                {event.event_name ??
-                                                                    'n/a'}
-                                                            </td>
-                                                        )}
-                                                        <td className="px-4 py-3">
-                                                            <StatusChip
-                                                                tone={
-                                                                    eventStatusTone[
-                                                                        event
-                                                                            .status
-                                                                    ]
-                                                                }
-                                                            >
-                                                                {event.status}
-                                                            </StatusChip>
-                                                        </td>
-                                                        {selectedEvent ===
-                                                            null && (
-                                                            <td className="px-6 py-3 text-muted-foreground">
-                                                                {event.signature_valid ===
-                                                                null
-                                                                    ? 'n/a'
-                                                                    : event.signature_valid
-                                                                      ? 'valid'
-                                                                      : 'invalid'}
-                                                            </td>
-                                                        )}
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-
-                            <div className="px-6 py-4">
-                                <Pagination paginator={events} />
-                            </div>
-                        </div>
-
-                        {selectedEvent && (
-                            <EventPane
-                                event={selectedEvent.event}
-                                deliveries={selectedEvent.deliveries}
-                                endpointMode={
-                                    selectedEvent.event.webhookEndpoint.mode
-                                }
-                                onClose={closeEventPane}
-                            />
                         )}
                     </div>
                 )}

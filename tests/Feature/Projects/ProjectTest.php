@@ -173,7 +173,7 @@ test('the endpoints tab shows each endpoints most recent event status', function
         );
 });
 
-test('the events tab aggregates events across all of a projects endpoints', function () {
+test('the legacy events tab redirects to project filtered events', function () {
     $user = User::factory()->create();
     $project = Project::factory()->for($user)->create();
     $endpointA = WebhookEndpoint::factory()->for($project)->create();
@@ -189,12 +189,7 @@ test('the events tab aggregates events across all of a projects endpoints', func
 
     $this->actingAs($user)
         ->get("/projects/{$project->id}?tab=events")
-        ->assertInertia(fn ($page) => $page
-            ->where('activeTab', 'events')
-            ->has('events.data', 2)
-            ->has('events.data.0.webhook_endpoint.name')
-            ->missing('events.data.0.webhook_endpoint.signing_secret')
-        );
+        ->assertRedirect(route('webhook-events.index', ['project' => $project->id]));
 });
 
 test('the events tab does not include events from another users project', function () {
