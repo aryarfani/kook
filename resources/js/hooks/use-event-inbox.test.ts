@@ -42,13 +42,20 @@ test('loads the next filtered page once, appends events, and removes duplicate I
     vi.stubGlobal('fetch', fetchPage);
     const initial = page(['a', 'b']);
     const { result } = renderHook(() =>
-        useEventInbox(initial, { ...filters, project: 'shop' }),
+        useEventInbox(
+            initial,
+            { ...filters, project: 'shop' },
+            'deployed-version',
+        ),
     );
     act(() => {
         void result.current.loadMore();
         void result.current.loadMore();
     });
     expect(fetchPage).toHaveBeenCalledOnce();
+    expect(fetchPage.mock.calls[0][1].headers).toMatchObject({
+        'X-Inertia-Version': 'deployed-version',
+    });
     expect(fetchPage.mock.calls[0][0]).toBe('/events?project=shop&page=2');
     await act(async () =>
         resolve({

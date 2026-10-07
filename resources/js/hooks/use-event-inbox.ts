@@ -4,6 +4,7 @@ import type { EventFilters, EventsPageProps } from '@/types/event-workspace';
 export function useEventInbox(
     initial: EventsPageProps['events'],
     filters: EventFilters,
+    version: string | null = null,
 ) {
     const scope = JSON.stringify(filters);
     const [state, setState] = useState({
@@ -65,6 +66,7 @@ export function useEventInbox(
                 signal: controller.signal,
                 headers: {
                     'X-Inertia': 'true',
+                    ...(version ? { 'X-Inertia-Version': version } : {}),
                     'X-Inertia-Partial-Component': 'events/index',
                     'X-Inertia-Partial-Data': 'events',
                     'X-Requested-With': 'XMLHttpRequest',
@@ -132,7 +134,7 @@ export function useEventInbox(
                 );
             }
         }
-    }, [events.current_page, events.last_page, scope, initial]);
+    }, [events.current_page, events.last_page, scope, initial, version]);
 
     return {
         events,

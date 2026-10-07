@@ -6,9 +6,10 @@ import type { EventFilters, EventsPageProps } from '@/types/event-workspace';
 export default function EventsIndex(props: EventsPageProps) {
     const {
         url,
+        version,
         props: { errors },
     } = usePage();
-    const inbox = useEventInbox(props.events, props.filters);
+    const inbox = useEventInbox(props.events, props.filters, version);
     function visit(filters: EventFilters, event?: string, partial = false) {
         const query: Record<string, string> = Object.fromEntries(
             Object.entries(filters).filter(([, value]) => value !== ''),

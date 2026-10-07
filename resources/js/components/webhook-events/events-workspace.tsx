@@ -80,7 +80,7 @@ export function EventsWorkspace({
         observer.observe(sentinelRef.current);
 
         return () => observer.disconnect();
-    }, [hasMore, loadingMore, loadError, onLoadMore]);
+    }, [hasMore, loadingMore, loadError, onLoadMore, inboxRevision]);
     const filteredEndpoints = endpoints.filter(
         (endpoint) =>
             !filters.project || endpoint.project_id === filters.project,
