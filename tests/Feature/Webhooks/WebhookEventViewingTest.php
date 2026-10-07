@@ -21,6 +21,27 @@ beforeEach(function () {
     ]);
 });
 
+test('payload search is literal case-insensitive and shared by list and export', function () {
+    $this->event->update(['payload' => ['nested' => ['message' => 'Customer 50%_OFF']], 'event_name' => 'not searched']);
+    WebhookEvent::factory()->create(['webhook_endpoint_id' => $this->endpoint->id, 'project_id' => $this->project->id, 'payload' => ['message' => '50xxOFF']]);
+    WebhookEvent::factory()->create(['payload' => ['message' => 'Customer 50%_OFF']]);
+    $query = http_build_query(['search' => '50%_off']);
+    $this->actingAs($this->user)->get('/events?'.$query)->assertInertia(fn ($page) => $page->has('events.data', 1)->where('events.data.0.id', $this->event->id)->missing('events.data.0.payload'));
+    $export = json_decode($this->get('/events/export?'.$query)->streamedContent(), true, flags: JSON_THROW_ON_ERROR);
+    expect(array_column($export, 'id'))->toBe([$this->event->id]);
+});
+
+test('endpoint title formats apply to historical inbox and inspector without replacing event names', function () {
+    $this->event->update(['payload' => ['entry' => [['changes' => [['field' => 'messages']]]]], 'event_name' => null]);
+    $this->actingAs($this->user)->patch('/webhook-endpoints/'.$this->endpoint->id.'/title-format', ['event_title_format' => '{{entry.0.changes.0.field}}'])->assertRedirect();
+    $this->get('/events?event='.$this->event->id)->assertInertia(fn ($page) => $page->where('events.data.0.display_title', 'messages')->where('selectedEvent.event.display_title', 'messages')->where('selectedEvent.event.event_name', null));
+    $foreign = WebhookEndpoint::factory()->create();
+    $this->patch('/webhook-endpoints/'.$foreign->id.'/title-format', ['event_title_format' => '{{object}}'])->assertForbidden();
+    $this->patchJson('/webhook-endpoints/'.$this->endpoint->id.'/title-format', ['event_title_format' => '{{bad[0]}}'])->assertUnprocessable();
+    $this->patch('/webhook-endpoints/'.$this->endpoint->id.'/title-format', ['event_title_format' => ''])->assertRedirect();
+    expect($this->endpoint->fresh()->event_title_format)->toBeNull();
+});
+
 test('events requires authentication', function () {
     $this->get('/events')->assertRedirect('/login');
     $this->get('/events/export')->assertRedirect('/login');

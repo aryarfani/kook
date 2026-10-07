@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\WebhookEvent;
+use App\Services\Webhooks\EventTitleFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -21,6 +22,11 @@ class WebhookEventResource extends JsonResource
             'webhook_endpoint_id' => $this->webhook_endpoint_id,
             'idempotency_key' => $this->idempotency_key,
             'event_name' => $this->event_name,
+            'display_title' => app(EventTitleFormatter::class)->format(
+                $this->resource->relationLoaded('webhookEndpoint') ? $this->webhookEndpoint->event_title_format : null,
+                $this->payload,
+                $this->event_name,
+            ),
             'headers' => $this->headers,
             'payload' => $this->payload,
             // Byte-for-byte body as received, so the UI renders it without reordering keys.

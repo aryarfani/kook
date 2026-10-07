@@ -3,7 +3,14 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { useEventInbox } from '@/hooks/use-event-inbox';
 import type { EventsPageProps } from '@/types/event-workspace';
 
-const filters = { project: '', endpoint: '', status: '', from: '', to: '' };
+const filters = {
+    project: '',
+    endpoint: '',
+    status: '',
+    from: '',
+    to: '',
+    search: '',
+};
 function page(ids: string[], current = 1, last = 3): EventsPageProps['events'] {
     return {
         data: ids.map((id) => ({

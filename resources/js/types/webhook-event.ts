@@ -27,6 +27,7 @@ export type WebhookEvent = {
 export type WebhookEventDetail = {
     id: string;
     event_name: string | null;
+    display_title?: string;
     status: WebhookEventStatus;
     signature_valid: boolean | null;
     received_at: string;

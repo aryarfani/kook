@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\User;
 use App\Models\WebhookEndpoint;
 use App\Models\WebhookEvent;
+use App\Services\Webhooks\EventTitleFormatter;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -14,7 +15,7 @@ class EventBrowserService
     public function __construct(private readonly AuditLogService $auditLog) {}
 
     /**
-     * @param  array{project: string, endpoint: string, status: string, from: string, to: string}  $filters
+     * @param  array{project: string, endpoint: string, status: string, from: string, to: string, search?: string}  $filters
      * @return Builder<WebhookEvent>
      */
     public function query(User $user, array $filters): Builder
@@ -53,6 +54,11 @@ class EventBrowserService
             $query->where('webhook_events.received_at', '<=', CarbonImmutable::parse($filters['to'])->utc());
         }
 
+        if (($filters['search'] ?? '') !== '') {
+            $literal = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], mb_strtolower($filters['search']));
+            $query->whereRaw("LOWER(CAST(webhook_events.payload AS TEXT)) LIKE ? ESCAPE '!'", ['%'.$literal.'%']);
+        }
+
         return $query->orderByDesc('webhook_events.received_at')->orderByDesc('webhook_events.id');
     }
 
@@ -65,6 +71,7 @@ class EventBrowserService
 
         return [
             ...$this->eventFields($event),
+            'display_title' => app(EventTitleFormatter::class)->format($event->webhookEndpoint->event_title_format, $event->payload, $event->event_name),
             'latest_delivery' => $delivery === null ? null : [
                 'status' => $delivery->status->value,
                 'http_status_code' => $delivery->http_status_code,
@@ -138,7 +145,7 @@ class EventBrowserService
 
     /**
      * @param  Builder<WebhookEvent>  $query
-     * @param  array{project: string, endpoint: string, status: string, from: string, to: string}  $filters
+     * @param  array{project: string, endpoint: string, status: string, from: string, to: string, search?: string}  $filters
      */
     public function recordExport(User $user, Builder $query, array $filters): void
     {

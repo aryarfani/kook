@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\WebhookEndpoints\DestroyWebhookEndpointRequest;
 use App\Http\Requests\WebhookEndpoints\RegenerateSigningSecretRequest;
 use App\Http\Requests\WebhookEndpoints\StoreWebhookEndpointRequest;
+use App\Http\Requests\WebhookEndpoints\UpdateEventTitleFormatRequest;
 use App\Http\Requests\WebhookEndpoints\UpdateWebhookEndpointRequest;
 use App\Models\Project;
 use App\Models\WebhookEndpoint;
@@ -136,6 +137,15 @@ class WebhookEndpointController extends Controller
         $this->endpoints->update($request->user(), $webhookEndpoint, $request->validated());
 
         return to_route('webhook-endpoints.show', $webhookEndpoint);
+    }
+
+    public function updateTitleFormat(UpdateEventTitleFormatRequest $request, WebhookEndpoint $webhookEndpoint): RedirectResponse
+    {
+        $this->endpoints->update($request->user(), $webhookEndpoint, [
+            'event_title_format' => $request->validated('event_title_format'),
+        ]);
+
+        return back();
     }
 
     public function destroy(DestroyWebhookEndpointRequest $request, WebhookEndpoint $webhookEndpoint): RedirectResponse

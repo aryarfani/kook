@@ -64,7 +64,7 @@ export const events = Array.from({ length: 90 }, (_, n) => {
         ['build.completed', 'build.failed', 'release.published'],
         ['test.ping', 'customer.updated', 'subscription.created'],
     ];
-    const event_name = names[n % 5][Math.floor(n / 5) % 3];
+    const event_name = n % 5 === 4 ? null : names[n % 5][Math.floor(n / 5) % 3];
     const status =
         endpoint.mode === 'capture'
             ? 'success'
@@ -76,7 +76,7 @@ export const events = Array.from({ length: 90 }, (_, n) => {
                   'success',
                   'success',
               ][Math.floor(n / 5) % 6];
-    const payload = {
+    let payload = {
         id: `synthetic_evt_${String(n + 1).padStart(4, '0')}`,
         type: event_name,
         livemode: false,
@@ -98,6 +98,37 @@ export const events = Array.from({ length: 90 }, (_, n) => {
         preview_notice:
             'Synthetic fixture. No real customer or credential data.',
     };
+
+    if (n % 5 === 4) {
+        payload = {
+            object: 'whatsapp_business_account',
+            entry: [
+                {
+                    id: 'synthetic_business_001',
+                    changes: [
+                        {
+                            field: 'messages',
+                            value: {
+                                messaging_product: 'whatsapp',
+                                statuses: [
+                                    {
+                                        id: `synthetic_message_${n + 1}`,
+                                        status: ['sent', 'delivered', 'read'][
+                                            Math.floor(n / 5) % 3
+                                        ],
+                                        recipient_id: 'synthetic_recipient_001',
+                                    },
+                                ],
+                            },
+                        },
+                    ],
+                },
+            ],
+            preview_notice:
+                'Synthetic WhatsApp fixture. No real account or contact data.',
+        };
+    }
+
     const headers = {
         'content-type': 'application/json',
         'user-agent': [

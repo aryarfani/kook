@@ -15,7 +15,14 @@ function props(): EventsWorkspaceProps {
                 mode: 'relay',
             },
         ],
-        filters: { project: '', endpoint: '', status: '', from: '', to: '' },
+        filters: {
+            project: '',
+            endpoint: '',
+            status: '',
+            from: '',
+            to: '',
+            search: '',
+        },
         selectedEvent: null,
         events: {
             data: [
@@ -53,6 +60,20 @@ function props(): EventsWorkspaceProps {
 }
 
 describe('Events workspace', () => {
+    test('payload search submits on Enter and clears the applied search', async () => {
+        const page = props();
+        render(<EventsWorkspace {...page} />);
+        await userEvent.type(
+            screen.getByRole('searchbox', { name: 'Search payload' }),
+            'messages',
+        );
+        expect(page.onFiltersChange).not.toHaveBeenCalled();
+        await userEvent.keyboard('{Enter}');
+        expect(page.onFiltersChange).toHaveBeenCalledWith({
+            ...page.filters,
+            search: 'messages',
+        });
+    });
     test('shows source context and opens the selected event from one list', async () => {
         const page = props();
         render(<EventsWorkspace {...page} />);
@@ -79,6 +100,7 @@ describe('Events workspace', () => {
             status: '',
             from: '',
             to: '',
+            search: '',
         });
     });
 

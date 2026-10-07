@@ -25,9 +25,18 @@ const vite = await createServer({
     server: { middlewareMode: true, hmr: { host: '127.0.0.1' } },
     appType: 'custom',
 });
+const { formatEventTitle, validTitleFormat } = await vite.ssrLoadModule(
+    '/resources/js/lib/event-title.ts',
+);
+const titleFor = (event) =>
+    formatEventTitle(
+        event.webhookEndpoint.event_title_format,
+        event.payload,
+        event.event_name,
+    );
 function filters(url) {
     return Object.fromEntries(
-        ['project', 'endpoint', 'status', 'from', 'to'].map((key) => [
+        ['project', 'endpoint', 'status', 'from', 'to', 'search'].map((key) => [
             key,
             url.searchParams.get(key) || '',
         ]),
@@ -41,6 +50,10 @@ function filtered(url, rows = events) {
             (!f.project || row.project_id === f.project) &&
             (!f.endpoint || row.webhook_endpoint_id === f.endpoint) &&
             (!f.status || row.status === f.status) &&
+            (!f.search ||
+                JSON.stringify(row.payload)
+                    .toLowerCase()
+                    .includes(f.search.trim().toLowerCase())) &&
             (!f.from || Date.parse(row.received_at) >= Date.parse(f.from)) &&
             (!f.to || Date.parse(row.received_at) <= Date.parse(f.to)),
     );
@@ -95,6 +108,7 @@ function selection(url, rows = events) {
         event: {
             id: event.id,
             event_name: event.event_name,
+            display_title: titleFor(event),
             status: event.status,
             signature_valid: event.signature_valid,
             received_at: event.received_at,
@@ -117,6 +131,7 @@ function pageFor(url) {
                 events: paginate(
                     filtered(url).map((event) => ({
                         ...event,
+                        display_title: titleFor(event),
                         latest_delivery:
                             deliveries.get(event.id)?.at(-1) ?? null,
                         project: projects.find(
@@ -288,6 +303,50 @@ const server = http.createServer(async (request, response) => {
         }
 
         if (request.method !== 'GET' && request.method !== 'HEAD') {
+            const titleEndpoint = endpoints.find(
+                (endpoint) =>
+                    url.pathname ===
+                    `/webhook-endpoints/${endpoint.id}/title-format`,
+            );
+
+            if (titleEndpoint && request.method === 'PATCH') {
+                let body = '';
+
+                for await (const chunk of request) {
+                    body += chunk;
+
+                    if (body.length > 10000) {
+                        throw new Error('Format request too large');
+                    }
+                }
+
+                const format = JSON.parse(body).event_title_format;
+
+                if (typeof format !== 'string' || !validTitleFormat(format)) {
+                    response.writeHead(422, {
+                        'Content-Type': 'application/json',
+                    });
+                    response.end(
+                        JSON.stringify({
+                            errors: {
+                                event_title_format: 'Invalid title format.',
+                            },
+                        }),
+                    );
+
+                    return;
+                }
+
+                titleEndpoint.event_title_format = format || null;
+
+                return redirect(
+                    request.headers.referer
+                        ? new URL(request.headers.referer).pathname +
+                              new URL(request.headers.referer).search
+                        : '/events',
+                );
+            }
+
             const event = events.find(
                 (event) => url.pathname === `/events/${event.id}/replay`,
             );

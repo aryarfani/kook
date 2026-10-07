@@ -17,6 +17,7 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property string $project_id
  * @property string $name
+ * @property string|null $event_title_format
  * @property WebhookEndpointMode $mode
  * @property string $destination_url
  * @property string|null $provider_id
@@ -34,6 +35,7 @@ class WebhookEndpoint extends Model
 
     protected $fillable = [
         'name',
+        'event_title_format',
         'mode',
         'destination_url',
         'provider_id',

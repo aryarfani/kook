@@ -27,11 +27,12 @@ class ListWebhookEventsRequest extends FormRequest
             'from' => $timestamp,
             'to' => [...$timestamp, Rule::when($this->filled('from'), ['after_or_equal:from'])],
             'event' => ['nullable', 'uuid'],
+            'search' => ['nullable', 'string', 'max:200'],
         ];
     }
 
     /**
-     * @return array{project: string, endpoint: string, status: string, from: string, to: string}
+     * @return array{project: string, endpoint: string, status: string, from: string, to: string, search?: string}
      */
     public function filters(): array
     {
@@ -41,6 +42,7 @@ class ListWebhookEventsRequest extends FormRequest
             'status' => (string) $this->validated('status', ''),
             'from' => (string) $this->validated('from', ''),
             'to' => (string) $this->validated('to', ''),
+            'search' => trim((string) $this->validated('search', '')),
         ];
     }
 }

@@ -1,6 +1,7 @@
 import { Cancel01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { PayloadViewer } from '@/components/dashboard/payload-viewer';
 import { StatusChip } from '@/components/dashboard/status-chip';
 import { Button } from '@/components/ui/button';
@@ -21,12 +22,14 @@ export function EventPane({
     endpointMode,
     onClose,
     source,
+    titleEditor,
 }: {
     event: WebhookEventDetail;
     deliveries: WebhookDelivery[];
     endpointMode: WebhookEndpointMode;
     onClose: () => void;
     source?: string;
+    titleEditor?: ReactNode;
 }) {
     const [payloadControls, setPayloadControls] =
         useState<HTMLDivElement | null>(null);
@@ -46,7 +49,9 @@ export function EventPane({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                         <h2 className="text-lg font-semibold break-words">
-                            {event.event_name ?? 'Unnamed event'}
+                            {event.display_title ??
+                                event.event_name ??
+                                'Unnamed event'}
                         </h2>
                         <p className="mt-1 text-sm text-muted-foreground">
                             {source} <span className="mx-2">·</span>
@@ -54,6 +59,7 @@ export function EventPane({
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
+                        {titleEditor}
                         <Button
                             variant="ghost"
                             size="icon"

@@ -2,7 +2,9 @@ import { Download01Icon, RefreshIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { EventPane } from '@/components/webhook-events/event-pane';
+import { EventTitleEditor } from '@/components/webhook-events/event-title-editor';
 import { toLocalIso } from '@/lib/export-date';
 import { relayStatus } from '@/lib/relay-status';
 import { cn } from '@/lib/utils';
@@ -211,6 +213,32 @@ export function EventsWorkspace({
                 >
                     Today
                 </Button>
+                <form
+                    className="min-w-44 flex-1 sm:max-w-72"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        const data = new FormData(e.currentTarget);
+                        onFiltersChange({
+                            ...filters,
+                            search: String(data.get('search') ?? '').trim(),
+                        });
+                    }}
+                >
+                    <Input
+                        key={JSON.stringify(filters)}
+                        type="search"
+                        name="search"
+                        aria-label="Search payload"
+                        placeholder="Search payload… (Enter)"
+                        maxLength={200}
+                        defaultValue={filters.search}
+                        onChange={(e) => {
+                            if (e.target.value === '' && filters.search) {
+                                onFiltersChange({ ...filters, search: '' });
+                            }
+                        }}
+                    />
+                </form>
                 {hasFilters && (
                     <Button
                         variant="ghost"
@@ -223,6 +251,7 @@ export function EventsWorkspace({
                                 status: '',
                                 from: '',
                                 to: '',
+                                search: '',
                             })
                         }
                     >
@@ -264,9 +293,17 @@ export function EventsWorkspace({
                                 {hasFilters ? 'matching' : 'events'}
                             </span>
                         </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            Newest first
-                        </p>
+                        <div className="mt-1 flex items-center justify-between gap-2">
+                            <p className="text-xs text-muted-foreground">
+                                Newest first
+                            </p>
+                            <EventTitleEditor
+                                endpoints={endpoints}
+                                defaultEndpointId={
+                                    selectedEndpoint?.id || filters.endpoint
+                                }
+                            />
+                        </div>
                     </div>
                     <div
                         key={inboxRevision}
@@ -289,7 +326,9 @@ export function EventsWorkspace({
                             >
                                 <div className="flex items-start justify-between gap-2">
                                     <span className="min-w-0 text-sm font-medium break-words">
-                                        {event.event_name ?? 'Unnamed event'}
+                                        {event.display_title ??
+                                            event.event_name ??
+                                            'Unnamed event'}
                                     </span>
                                     <time className="shrink-0 text-xs text-muted-foreground">
                                         {new Date(
@@ -392,6 +431,15 @@ export function EventsWorkspace({
                                     .filter(Boolean)
                                     .join(' / ')}
                                 onClose={onClose}
+                                titleEditor={
+                                    <EventTitleEditor
+                                        endpoints={endpoints}
+                                        defaultEndpointId={
+                                            selectedEvent.event.webhookEndpoint
+                                                .id
+                                        }
+                                    />
+                                }
                             />
                         </>
                     ) : (

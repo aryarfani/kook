@@ -13,6 +13,9 @@ Route::middleware(['auth', 'throttle:60,1'])->group(function () {
     Route::put('webhook-endpoints/{webhook_endpoint}', [WebhookEndpointController::class, 'update'])
         ->name('webhook-endpoints.update');
 
+    Route::patch('webhook-endpoints/{webhook_endpoint}/title-format', [WebhookEndpointController::class, 'updateTitleFormat'])
+        ->name('webhook-endpoints.title-format');
+
     Route::delete('webhook-endpoints/{webhook_endpoint}', [WebhookEndpointController::class, 'destroy'])
         ->name('webhook-endpoints.destroy');
 

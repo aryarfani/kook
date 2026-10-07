@@ -13,6 +13,7 @@ export type EventEndpoint = {
     name: string;
     project_id: string;
     mode: WebhookEndpointMode;
+    event_title_format?: string | null;
 };
 export type EventFilters = {
     project: string;
@@ -20,10 +21,12 @@ export type EventFilters = {
     status: string;
     from: string;
     to: string;
+    search: string;
 };
 export type EventRow = {
     id: string;
     event_name: string | null;
+    display_title?: string;
     status: WebhookEventStatus;
     received_at: string;
     signature_valid: boolean | null;
