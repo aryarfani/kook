@@ -10,6 +10,26 @@ vi.mock('@/hooks/use-clipboard', () => ({
 }));
 
 describe('PayloadViewer', () => {
+    test('expanded viewer toggles between formatted JSON and the original body', async () => {
+        const { container } = render(
+            <PayloadViewer raw='{"z":1,"a":2}' expanded />,
+        );
+        expect(container.querySelector('pre')?.textContent).toBe(
+            '{\n  "z": 1,\n  "a": 2\n}',
+        );
+        await userEvent.click(
+            screen.getByRole('checkbox', { name: 'Format JSON' }),
+        );
+        expect(container.querySelector('pre')?.textContent).toBe(
+            '{"z":1,"a":2}',
+        );
+        await userEvent.click(
+            screen.getByRole('checkbox', { name: 'Format JSON' }),
+        );
+        expect(container.querySelector('pre')?.textContent).toBe(
+            '{\n  "z": 1,\n  "a": 2\n}',
+        );
+    });
     test('copies the raw body verbatim when the copy button is clicked', async () => {
         const raw = '{"z":1,"a":2}';
         const user = userEvent.setup();

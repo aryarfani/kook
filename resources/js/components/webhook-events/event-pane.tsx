@@ -1,11 +1,14 @@
 import { Cancel01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
+import { useState } from 'react';
+import { PayloadViewer } from '@/components/dashboard/payload-viewer';
 import { StatusChip } from '@/components/dashboard/status-chip';
 import { Button } from '@/components/ui/button';
-import { EventDetailSections } from '@/components/webhook-events/event-detail-sections';
 import { ReplayEventButton } from '@/components/webhook-events/replay-event-button';
+import { useClipboard } from '@/hooks/use-clipboard';
 import { relayStatus } from '@/lib/relay-status';
-import { eventStatusTone } from '@/lib/status-tones';
+import { deliveryStatusTone, eventStatusTone } from '@/lib/status-tones';
+import { cn } from '@/lib/utils';
 import type {
     WebhookDelivery,
     WebhookEndpointMode,
@@ -17,68 +20,50 @@ export function EventPane({
     deliveries,
     endpointMode,
     onClose,
+    source,
 }: {
     event: WebhookEventDetail;
     deliveries: WebhookDelivery[];
     endpointMode: WebhookEndpointMode;
     onClose: () => void;
+    source?: string;
 }) {
-    const latestDelivery = deliveries.reduce<WebhookDelivery | null>(
-        (latest, delivery) =>
-            !latest || delivery.attempt_number > latest.attempt_number
+    const [tab, setTab] = useState('Payload');
+    const [copied, copy] = useClipboard();
+    const latest = deliveries.reduce<WebhookDelivery | null>(
+        (current, delivery) =>
+            !current || delivery.attempt_number > current.attempt_number
                 ? delivery
-                : latest,
+                : current,
         null,
     );
 
     return (
-        <div
-            className="space-y-6 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1"
-            data-test="event-pane"
-        >
-            <div className="rounded-2xl border border-border bg-card px-6 py-4">
-                <div className="flex items-start justify-between gap-3">
+        <div className="flex h-full min-h-0 flex-col" data-test="event-pane">
+            <div className="shrink-0 px-5 pt-5 pb-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                        <h2 className="truncate font-semibold">
-                            {event.event_name ?? 'Event'}
+                        <h2 className="text-lg font-semibold break-words">
+                            {event.event_name ?? 'Unnamed event'}
                         </h2>
                         <p className="mt-1 text-sm text-muted-foreground">
+                            {source} <span className="mx-2">·</span>
                             {new Date(event.received_at).toLocaleString()}
                         </p>
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <StatusChip tone={eventStatusTone[event.status]}>
-                                {event.status}
-                            </StatusChip>
-                            {event.signature_valid !== null && (
-                                <StatusChip
-                                    tone={
-                                        event.signature_valid
-                                            ? 'success'
-                                            : 'danger'
-                                    }
-                                >
-                                    {event.signature_valid
-                                        ? 'valid signature'
-                                        : 'invalid signature'}
-                                </StatusChip>
-                            )}
-                        </div>
-                        <p className="mt-3 text-xs text-muted-foreground">
-                            Relay Status:{' '}
-                            {relayStatus(
-                                endpointMode,
-                                event.status,
-                                latestDelivery,
-                            )}
-                        </p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex items-center gap-2">
                         {event.status === 'success' &&
                             endpointMode !== 'capture' && (
                                 <ReplayEventButton event={event} />
                             )}
                         <Button
-                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => copy(event.id)}
+                        >
+                            {copied === event.id ? 'Copied' : 'Copy event ID'}
+                        </Button>
+                        <Button
                             variant="ghost"
                             size="icon"
                             onClick={onClose}
@@ -92,13 +77,167 @@ export function EventPane({
                         </Button>
                     </div>
                 </div>
+                <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3 border-y border-border py-3 text-xs">
+                    <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">Ingestion</span>
+                        <StatusChip tone={eventStatusTone[event.status]}>
+                            {event.status}
+                        </StatusChip>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">Signature</span>
+                        <span>
+                            {event.signature_valid === null
+                                ? 'Not checked'
+                                : event.signature_valid
+                                  ? 'Valid'
+                                  : 'Invalid'}
+                        </span>
+                    </div>
+                    <p>
+                        Relay Status:{' '}
+                        {relayStatus(endpointMode, event.status, latest)}
+                    </p>
+                </div>
             </div>
+            <div
+                role="tablist"
+                aria-label="Event data"
+                className="flex shrink-0 gap-6 border-b border-border px-5"
+            >
+                {['Payload', 'Headers', 'Delivery attempts'].map((name) => (
+                    <button
+                        key={name}
+                        id={`event-tab-${name.replaceAll(' ', '-')}`}
+                        role="tab"
+                        tabIndex={tab === name ? 0 : -1}
+                        aria-selected={tab === name}
+                        aria-controls="event-data-panel"
+                        onClick={() => setTab(name)}
+                        onKeyDown={(e) => {
+                            const names = [
+                                'Payload',
+                                'Headers',
+                                'Delivery attempts',
+                            ];
+                            const index = names.indexOf(name);
+                            const next =
+                                e.key === 'ArrowRight'
+                                    ? (index + 1) % 3
+                                    : e.key === 'ArrowLeft'
+                                      ? (index + 2) % 3
+                                      : e.key === 'Home'
+                                        ? 0
+                                        : e.key === 'End'
+                                          ? 2
+                                          : null;
 
-            <EventDetailSections
-                event={event}
-                deliveries={deliveries}
-                endpointMode={endpointMode}
-            />
+                            if (next !== null) {
+                                e.preventDefault();
+                                setTab(names[next]);
+                                e.currentTarget.parentElement
+                                    ?.querySelectorAll<HTMLButtonElement>(
+                                        '[role="tab"]',
+                                    )
+                                    [next]?.focus();
+                            }
+                        }}
+                        className={cn(
+                            'border-b-2 border-transparent py-3 text-sm text-muted-foreground hover:text-foreground',
+                            tab === name && 'border-signal text-signal',
+                        )}
+                    >
+                        {name}
+                        {name === 'Delivery attempts' &&
+                            ` (${deliveries.length})`}
+                    </button>
+                ))}
+            </div>
+            <div
+                id="event-data-panel"
+                role="tabpanel"
+                aria-labelledby={`event-tab-${tab.replaceAll(' ', '-')}`}
+                className="flex min-h-0 flex-1 flex-col"
+            >
+                {tab === 'Payload' && (
+                    <PayloadViewer raw={event.raw_body} expanded />
+                )}
+                {tab === 'Headers' && (
+                    <dl className="min-h-0 overflow-auto px-5 py-3 font-mono text-xs">
+                        {Object.entries(event.headers).map(([name, value]) => (
+                            <div
+                                key={name}
+                                className="grid gap-2 border-b border-border py-3 sm:grid-cols-[minmax(160px,1fr)_3fr]"
+                            >
+                                <dt className="break-all text-muted-foreground">
+                                    {name}
+                                </dt>
+                                <dd className="break-all whitespace-pre-wrap">
+                                    {value}
+                                </dd>
+                            </div>
+                        ))}
+                        {!Object.keys(event.headers).length && (
+                            <p className="text-muted-foreground">
+                                No headers recorded.
+                            </p>
+                        )}
+                    </dl>
+                )}
+                {tab === 'Delivery attempts' && (
+                    <div className="min-h-0 overflow-auto px-5 py-3">
+                        {endpointMode === 'capture' ? (
+                            <p className="text-sm text-muted-foreground">
+                                This endpoint is receive-only, so events are
+                                stored and never forwarded.
+                            </p>
+                        ) : !deliveries.length ? (
+                            <p className="text-sm text-muted-foreground">
+                                No delivery attempts yet.
+                            </p>
+                        ) : (
+                            deliveries.map((delivery) => (
+                                <div
+                                    key={delivery.id}
+                                    className="border-b border-border py-4"
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <h3 className="text-sm font-medium">
+                                            Attempt {delivery.attempt_number}
+                                        </h3>
+                                        <StatusChip
+                                            tone={
+                                                deliveryStatusTone[
+                                                    delivery.status
+                                                ]
+                                            }
+                                        >
+                                            {delivery.status}
+                                        </StatusChip>
+                                    </div>
+                                    <p className="mt-2 text-sm text-muted-foreground">
+                                        {delivery.http_status_code
+                                            ? `HTTP ${delivery.http_status_code}`
+                                            : 'No response'}
+                                        {delivery.duration_ms !== null &&
+                                            ` · ${delivery.duration_ms}ms`}
+                                    </p>
+                                    {delivery.error_message && (
+                                        <p className="mt-2 text-sm break-words text-destructive">
+                                            {delivery.error_message}
+                                        </p>
+                                    )}
+                                    {delivery.response_body && (
+                                        <pre className="mt-3 overflow-auto font-mono text-xs break-all whitespace-pre-wrap">
+                                            {delivery.response_body}
+                                        </pre>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

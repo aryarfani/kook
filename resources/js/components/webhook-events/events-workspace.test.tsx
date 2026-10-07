@@ -57,14 +57,13 @@ describe('Events workspace', () => {
         const page = props();
         render(<EventsWorkspace {...page} />);
         const table = within(
-            screen.getByRole('table', { name: 'Webhook events' }),
+            screen.getByRole('region', { name: 'Event inbox' }),
         );
-        expect(table.getByText('Demo shop')).toBeInTheDocument();
-        expect(table.getByText('Stripe billing')).toBeInTheDocument();
-        expect(table.getByText('Relay Status')).toBeInTheDocument();
+        expect(table.getByText(/Demo shop/)).toBeInTheDocument();
+        expect(table.getByText(/Stripe billing/)).toBeInTheDocument();
         expect(table.getByText('Delivered · HTTP 200')).toBeInTheDocument();
         await userEvent.click(
-            screen.getByRole('button', { name: 'invoice.paid' }),
+            screen.getByRole('button', { name: /invoice.paid/ }),
         );
         expect(page.onSelect).toHaveBeenCalledWith('evt-one');
     });
@@ -129,7 +128,16 @@ describe('Events workspace', () => {
             screen.getByRole('region', { name: 'Event inspector' }),
         );
         expect(inspector.getByText(/demo-invoice-100/)).toBeInTheDocument();
+        expect(inspector.queryByText('content-type')).not.toBeInTheDocument();
+        await userEvent.click(inspector.getByRole('tab', { name: 'Headers' }));
         expect(inspector.getByText('content-type')).toBeInTheDocument();
+        expect(
+            inspector.queryByText(/demo-invoice-100/),
+        ).not.toBeInTheDocument();
+        await userEvent.click(
+            inspector.getByRole('tab', { name: /Delivery attempts/ }),
+        );
+        expect(inspector.getByText(/never forwarded/)).toBeInTheDocument();
         expect(
             inspector.getByText('Relay Status: Receive Only'),
         ).toBeInTheDocument();
