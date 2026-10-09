@@ -90,9 +90,11 @@ class WebhookEndpoint extends Model
      */
     public function latestEvent(): HasOne
     {
-        // Not latestOfMany(): it always adds MAX(id) as a tiebreaker, and
-        // ids are UUIDs here, which Postgres can't MAX(). A plain ordered
-        // hasOne avoids the aggregate subquery entirely.
-        return $this->hasOne(WebhookEvent::class)->orderByDesc('received_at');
+        // UUIDs cannot use PostgreSQL MAX(id). An eager-load group limit
+        // returns one row per endpoint instead of hydrating its full history.
+        return $this->hasOne(WebhookEvent::class)
+            ->orderByDesc('received_at')
+            ->orderByDesc('id')
+            ->limit(1);
     }
 }

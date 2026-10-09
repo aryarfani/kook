@@ -84,8 +84,10 @@ class WebhookEvent extends Model
      */
     public function latestDelivery(): HasOne
     {
-        // Not latestOfMany(): same UUID/MAX() issue as
-        // WebhookEndpoint::latestEvent(), avoided the same way.
-        return $this->hasOne(WebhookDelivery::class, 'event_id')->orderByDesc('attempt_number');
+        // Limit eager loading per event, preserving PostgreSQL UUID support.
+        return $this->hasOne(WebhookDelivery::class, 'event_id')
+            ->orderByDesc('attempt_number')
+            ->orderByDesc('id')
+            ->limit(1);
     }
 }
