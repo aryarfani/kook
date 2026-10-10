@@ -235,6 +235,11 @@ export function EventPane({
                                             {delivery.status}
                                         </StatusChip>
                                     </div>
+                                    {delivery.destination_url && (
+                                        <p className="mt-1 text-xs break-all text-muted-foreground">
+                                            → {delivery.destination_url}
+                                        </p>
+                                    )}
                                     <p className="mt-2 text-sm text-muted-foreground">
                                         {delivery.http_status_code
                                             ? `HTTP ${delivery.http_status_code}`

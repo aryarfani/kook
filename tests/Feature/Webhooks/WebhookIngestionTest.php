@@ -28,10 +28,11 @@ test('a relay endpoint accepts, stores, and forwards a webhook', function () {
         'example.com/*' => Http::response(['ok' => true], 200),
     ]);
 
-    $endpoint = WebhookEndpoint::factory()->create([
-        'status' => WebhookEndpointStatus::Active,
-        'destination_url' => 'https://example.com/hooks',
-    ]);
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->create([
+            'status' => WebhookEndpointStatus::Active,
+        ]);
 
     $response = $this->postJson("/webhooks/{$endpoint->ingest_token}", ['event' => 'order.created'], [
         'X-Custom-Header' => 'abc',
@@ -60,10 +61,11 @@ test('a relay endpoint accepts, stores, and forwards a webhook', function () {
 test('duplicate deliveries with the same idempotency key are not reprocessed', function () {
     Http::fake(['example.com/*' => Http::response('ok', 200)]);
 
-    $endpoint = WebhookEndpoint::factory()->create([
-        'status' => WebhookEndpointStatus::Active,
-        'destination_url' => 'https://example.com/hooks',
-    ]);
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->create([
+            'status' => WebhookEndpointStatus::Active,
+        ]);
 
     $headers = ['Idempotency-Key' => 'evt_123'];
 
@@ -84,13 +86,14 @@ test('a managed endpoint with a valid signature is verified and forwarded', func
     $provider = Provider::query()->where('key', 'generic_hmac')->firstOrFail();
     $secret = 'super-secret';
 
-    $endpoint = WebhookEndpoint::factory()->create([
-        'status' => WebhookEndpointStatus::Active,
-        'destination_url' => 'https://example.com/hooks',
-        'mode' => WebhookEndpointMode::Managed,
-        'provider_id' => $provider->id,
-        'provider_secret' => $secret,
-    ]);
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->create([
+            'status' => WebhookEndpointStatus::Active,
+            'mode' => WebhookEndpointMode::Managed,
+            'provider_id' => $provider->id,
+            'provider_secret' => $secret,
+        ]);
 
     $body = json_encode(['event' => 'payment.success']);
     $signature = hash_hmac('sha256', $body, $secret);
@@ -116,13 +119,14 @@ test('a managed endpoint with an invalid signature is rejected and never forward
 
     $provider = Provider::query()->where('key', 'generic_hmac')->firstOrFail();
 
-    $endpoint = WebhookEndpoint::factory()->create([
-        'status' => WebhookEndpointStatus::Active,
-        'destination_url' => 'https://example.com/hooks',
-        'mode' => WebhookEndpointMode::Managed,
-        'provider_id' => $provider->id,
-        'provider_secret' => 'super-secret',
-    ]);
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->create([
+            'status' => WebhookEndpointStatus::Active,
+            'mode' => WebhookEndpointMode::Managed,
+            'provider_id' => $provider->id,
+            'provider_secret' => 'super-secret',
+        ]);
 
     $body = json_encode(['event' => 'payment.success']);
 
@@ -148,13 +152,14 @@ test('a stripe managed endpoint verifies the signed event end to end', function 
     $provider = Provider::query()->where('key', 'stripe')->firstOrFail();
     $secret = 'whsec_test';
 
-    $endpoint = WebhookEndpoint::factory()->create([
-        'status' => WebhookEndpointStatus::Active,
-        'destination_url' => 'https://example.com/hooks',
-        'mode' => WebhookEndpointMode::Managed,
-        'provider_id' => $provider->id,
-        'provider_secret' => $secret,
-    ]);
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->create([
+            'status' => WebhookEndpointStatus::Active,
+            'mode' => WebhookEndpointMode::Managed,
+            'provider_id' => $provider->id,
+            'provider_secret' => $secret,
+        ]);
 
     $body = json_encode(['id' => 'evt_1', 'type' => 'payment_intent.succeeded']);
     $timestamp = time();
@@ -183,13 +188,14 @@ test('a flutterwave managed endpoint verifies the hmac-signed event end to end',
     $provider = Provider::query()->where('key', 'flutterwave')->firstOrFail();
     $secret = 'my-secret-hash';
 
-    $endpoint = WebhookEndpoint::factory()->create([
-        'status' => WebhookEndpointStatus::Active,
-        'destination_url' => 'https://example.com/hooks',
-        'mode' => WebhookEndpointMode::Managed,
-        'provider_id' => $provider->id,
-        'provider_secret' => $secret,
-    ]);
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->create([
+            'status' => WebhookEndpointStatus::Active,
+            'mode' => WebhookEndpointMode::Managed,
+            'provider_id' => $provider->id,
+            'provider_secret' => $secret,
+        ]);
 
     $body = json_encode(['event' => 'charge.completed']);
     $signature = base64_encode(hash_hmac('sha256', $body, $secret, true));
@@ -216,13 +222,14 @@ test('a flutterwave managed endpoint accepts the legacy plain secret hash header
     $provider = Provider::query()->where('key', 'flutterwave')->firstOrFail();
     $secret = 'my-secret-hash';
 
-    $endpoint = WebhookEndpoint::factory()->create([
-        'status' => WebhookEndpointStatus::Active,
-        'destination_url' => 'https://example.com/hooks',
-        'mode' => WebhookEndpointMode::Managed,
-        'provider_id' => $provider->id,
-        'provider_secret' => $secret,
-    ]);
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->create([
+            'status' => WebhookEndpointStatus::Active,
+            'mode' => WebhookEndpointMode::Managed,
+            'provider_id' => $provider->id,
+            'provider_secret' => $secret,
+        ]);
 
     $body = json_encode(['event' => 'charge.completed']);
 
@@ -241,10 +248,11 @@ test('a flutterwave managed endpoint accepts the legacy plain secret hash header
 test('the event name is resolved from a type field when no event field is present', function () {
     Http::fake(['example.com/*' => Http::response('ok', 200)]);
 
-    $endpoint = WebhookEndpoint::factory()->create([
-        'status' => WebhookEndpointStatus::Active,
-        'destination_url' => 'https://example.com/hooks',
-    ]);
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->create([
+            'status' => WebhookEndpointStatus::Active,
+        ]);
 
     $this->postJson("/webhooks/{$endpoint->ingest_token}", ['type' => 'charge.success'])
         ->assertStatus(200);
@@ -255,10 +263,11 @@ test('the event name is resolved from a type field when no event field is presen
 test('the event name is null when the payload has no recognizable event field', function () {
     Http::fake(['example.com/*' => Http::response('ok', 200)]);
 
-    $endpoint = WebhookEndpoint::factory()->create([
-        'status' => WebhookEndpointStatus::Active,
-        'destination_url' => 'https://example.com/hooks',
-    ]);
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->create([
+            'status' => WebhookEndpointStatus::Active,
+        ]);
 
     $this->postJson("/webhooks/{$endpoint->ingest_token}", ['foo' => 'bar'])
         ->assertStatus(200);
@@ -285,7 +294,6 @@ test('a receive-only endpoint stores the event without forwarding it', function 
     $endpoint = WebhookEndpoint::factory()->create([
         'status' => WebhookEndpointStatus::Active,
         'mode' => WebhookEndpointMode::Capture,
-        'destination_url' => null,
     ]);
 
     $this->postJson("/webhooks/{$endpoint->ingest_token}", ['event' => 'order.created'])
@@ -297,4 +305,23 @@ test('a receive-only endpoint stores the event without forwarding it', function 
 
     Http::assertNothingSent();
     expect(WebhookDelivery::count())->toBe(0);
+});
+
+test('an event from an endpoint with several destinations is forwarded to each of them', function () {
+    Http::fake(['*' => Http::response('ok', 200)]);
+
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/first', 'https://example.com/second'])
+        ->create(['status' => WebhookEndpointStatus::Active]);
+
+    $this->postJson("/webhooks/{$endpoint->ingest_token}", ['event' => 'order.created'])
+        ->assertStatus(200);
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://example.com/first');
+    Http::assertSent(fn ($request) => $request->url() === 'https://example.com/second');
+    Http::assertSentCount(2);
+
+    expect(WebhookDelivery::count())->toBe(2);
+    expect(WebhookDelivery::where('destination_id', $endpoint->destinations[0]->id)->count())->toBe(1);
+    expect(WebhookDelivery::where('destination_id', $endpoint->destinations[1]->id)->count())->toBe(1);
 });

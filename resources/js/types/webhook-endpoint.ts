@@ -19,7 +19,7 @@ export type WebhookEndpoint = {
     project_id: string;
     name: string;
     mode: WebhookEndpointMode;
-    destination_url: string | null;
+    destination_urls: string[];
     provider_id: string | null;
     provider: Provider | null;
     ingest_token: string;

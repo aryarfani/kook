@@ -25,7 +25,7 @@ class StoreWebhookEndpointRequest extends FormRequest
     {
         return [
             'name' => $this->endpointNameRules(),
-            'destination_url' => $this->destinationUrlRules(),
+            ...$this->destinationUrlRules(),
             'mode' => $this->modeRules(),
             'provider_id' => $this->providerIdRules(),
             'provider_secret' => $this->providerSecretRules(),

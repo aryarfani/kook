@@ -48,6 +48,7 @@ class WebhookEndpointController extends Controller
             'providers' => $this->providers->active(),
             'webhookEndpoint' => $webhookEndpoint->load([
                 'provider',
+                'destinations',
                 'latestEvent:id,webhook_endpoint_id,status,received_at',
                 'latestEvent.latestDelivery:id,event_id,status,attempt_number',
             ]),

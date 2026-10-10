@@ -20,6 +20,10 @@ class WebhookDeliveryResource extends JsonResource
             'id' => $this->id,
             'attempt_number' => $this->attempt_number,
             'status' => $this->status,
+            'destination_url' => $this->whenLoaded(
+                'destination',
+                fn () => $this->destination->url,
+            ),
             'http_status_code' => $this->http_status_code,
             'error_message' => $this->error_message,
             'duration_ms' => $this->duration_ms,

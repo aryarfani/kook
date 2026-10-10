@@ -23,6 +23,9 @@ class WebhookDeliveryRepository
     public function forEvent(WebhookEvent $event): Collection
     {
         /** @var Collection<int, WebhookDelivery> */
-        return $event->deliveries()->orderByDesc('attempt_number')->get();
+        return $event->deliveries()
+            ->with('destination:id,webhook_endpoint_id,url')
+            ->orderByDesc('attempt_number')
+            ->get();
     }
 }

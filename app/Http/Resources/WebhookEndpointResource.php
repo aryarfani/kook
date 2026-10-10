@@ -20,7 +20,7 @@ class WebhookEndpointResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'mode' => $this->mode,
-            'destination_url' => $this->destination_url,
+            'destination_urls' => $this->destinations->pluck('url'),
             'status' => $this->status,
             'created_at' => $this->created_at,
         ];

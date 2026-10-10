@@ -30,7 +30,7 @@ class ForwardWebhookAction
         'x-forwarded-proto',
     ];
 
-    public function execute(WebhookEvent $event): WebhookForwardResult
+    public function execute(WebhookEvent $event, string $destinationUrl): WebhookForwardResult
     {
         $endpoint = $event->webhookEndpoint;
         $startedAt = microtime(true);
@@ -40,8 +40,8 @@ class ForwardWebhookAction
                 ->withHeaders($this->buildHeaders($event));
 
             $response = $endpoint->mode === WebhookEndpointMode::Relay
-                ? $request->withBody($event->raw_body, $this->contentType($event))->post($endpoint->destination_url)
-                : $request->withBody(json_encode($event->payload) ?: '{}', 'application/json')->post($endpoint->destination_url);
+                ? $request->withBody($event->raw_body, $this->contentType($event))->post($destinationUrl)
+                : $request->withBody(json_encode($event->payload) ?: '{}', 'application/json')->post($destinationUrl);
 
             $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
 

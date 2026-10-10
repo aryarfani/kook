@@ -19,7 +19,7 @@ test('a user can create a relay webhook endpoint for their own project', functio
 
     $response = $this->actingAs($user)->post("/projects/{$project->id}/webhook-endpoints", [
         'name' => 'Payments relay',
-        'destination_url' => 'https://example.com/hooks',
+        'destination_urls' => ['https://example.com/hooks'],
         'mode' => 'relay',
     ]);
 
@@ -34,6 +34,27 @@ test('a user can create a relay webhook endpoint for their own project', functio
         ->signing_secret->not->toBeEmpty();
 });
 
+test('a relay endpoint can be created with several destination urls stored in order', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->for($user)->create();
+
+    $this->actingAs($user)->post("/projects/{$project->id}/webhook-endpoints", [
+        'name' => 'Payments relay',
+        'destination_urls' => [
+            'https://example.com/first',
+            'https://example.com/second',
+        ],
+        'mode' => 'relay',
+    ]);
+
+    $endpoint = WebhookEndpoint::first();
+
+    expect($endpoint->destinationUrls())->toBe([
+        'https://example.com/first',
+        'https://example.com/second',
+    ]);
+});
+
 test('creating a webhook endpoint requires a valid destination url', function () {
     $user = User::factory()->create();
     $project = Project::factory()->for($user)->create();
@@ -41,10 +62,43 @@ test('creating a webhook endpoint requires a valid destination url', function ()
     $this->actingAs($user)
         ->post("/projects/{$project->id}/webhook-endpoints", [
             'name' => 'Bad endpoint',
-            'destination_url' => 'not-a-url',
+            'destination_urls' => ['not-a-url'],
             'mode' => 'relay',
         ])
-        ->assertSessionHasErrors('destination_url');
+        ->assertSessionHasErrors('destination_urls.0');
+
+    expect(WebhookEndpoint::count())->toBe(0);
+});
+
+test('creating a webhook endpoint rejects an invalid url among several destinations', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->for($user)->create();
+
+    $this->actingAs($user)
+        ->post("/projects/{$project->id}/webhook-endpoints", [
+            'name' => 'Mixed endpoint',
+            'destination_urls' => ['https://example.com/ok', 'not-a-url'],
+            'mode' => 'relay',
+        ])
+        ->assertSessionHasErrors('destination_urls.1');
+
+    expect(WebhookEndpoint::count())->toBe(0);
+});
+
+test('creating a webhook endpoint rejects duplicate destination urls', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->for($user)->create();
+
+    $this->actingAs($user)
+        ->post("/projects/{$project->id}/webhook-endpoints", [
+            'name' => 'Duplicate endpoint',
+            'destination_urls' => [
+                'https://example.com/hooks',
+                'https://example.com/hooks',
+            ],
+            'mode' => 'relay',
+        ])
+        ->assertSessionHasErrors('destination_urls.1');
 
     expect(WebhookEndpoint::count())->toBe(0);
 });
@@ -56,10 +110,10 @@ test('creating a webhook endpoint rejects destinations that resolve to private n
     $this->actingAs($user)
         ->post("/projects/{$project->id}/webhook-endpoints", [
             'name' => 'SSRF attempt',
-            'destination_url' => 'http://127.0.0.1/secret',
+            'destination_urls' => ['http://127.0.0.1/secret'],
             'mode' => 'relay',
         ])
-        ->assertSessionHasErrors('destination_url');
+        ->assertSessionHasErrors('destination_urls.0');
 
     expect(WebhookEndpoint::count())->toBe(0);
 });
@@ -71,7 +125,7 @@ test('managed mode requires a provider and secret', function () {
     $this->actingAs($user)
         ->post("/projects/{$project->id}/webhook-endpoints", [
             'name' => 'Managed endpoint',
-            'destination_url' => 'https://example.com/hooks',
+            'destination_urls' => ['https://example.com/hooks'],
             'mode' => 'managed',
         ])
         ->assertSessionHasErrors(['provider_id', 'provider_secret']);
@@ -85,7 +139,7 @@ test('a user cannot create a webhook endpoint on another users project', functio
     $this->actingAs($intruder)
         ->post("/projects/{$project->id}/webhook-endpoints", [
             'name' => 'Intruding endpoint',
-            'destination_url' => 'https://example.com/hooks',
+            'destination_urls' => ['https://example.com/hooks'],
             'mode' => 'relay',
         ])
         ->assertForbidden();
@@ -210,7 +264,7 @@ test('a user can update their own webhook endpoint', function () {
         ->put("/webhook-endpoints/{$endpoint->id}", [
             'name' => 'New name',
             'mode' => 'relay',
-            'destination_url' => 'https://example.com/new',
+            'destination_urls' => ['https://example.com/new'],
             'status' => 'paused',
         ])
         ->assertRedirect("/webhook-endpoints/{$endpoint->id}");
@@ -218,6 +272,51 @@ test('a user can update their own webhook endpoint', function () {
     expect($endpoint->fresh())
         ->name->toBe('New name')
         ->status->toBe(WebhookEndpointStatus::Paused);
+});
+
+test('updating destination urls removes removed rows, keeps kept rows, and appends new ones', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->for($user)->create();
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/keep', 'https://example.com/drop'])
+        ->for($project)
+        ->create();
+    $keptId = $endpoint->destinations[0]->id;
+
+    $this->actingAs($user)->put("/webhook-endpoints/{$endpoint->id}", [
+        'name' => $endpoint->name,
+        'mode' => 'relay',
+        'destination_urls' => ['https://example.com/keep', 'https://example.com/added'],
+        'status' => 'active',
+    ]);
+
+    $endpoint->refresh();
+
+    expect($endpoint->destinationUrls())->toBe([
+        'https://example.com/keep',
+        'https://example.com/added',
+    ]);
+    // The surviving URL keeps its id so queued delivery jobs still resolve.
+    expect($endpoint->destinations[0]->id)->toBe($keptId);
+});
+
+test('a relay endpoint cannot be updated to have no destination urls', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->for($user)->create();
+    $endpoint = WebhookEndpoint::factory()->for($project)
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->create();
+
+    $this->actingAs($user)
+        ->put("/webhook-endpoints/{$endpoint->id}", [
+            'name' => $endpoint->name,
+            'mode' => 'relay',
+            'destination_urls' => [],
+            'status' => 'active',
+        ])
+        ->assertSessionHasErrors('destination_urls');
+
+    expect($endpoint->fresh()->destinations()->count())->toBe(1);
 });
 
 test('a user cannot update another users webhook endpoint', function () {
@@ -229,7 +328,7 @@ test('a user cannot update another users webhook endpoint', function () {
     $this->actingAs($intruder)
         ->put("/webhook-endpoints/{$endpoint->id}", [
             'name' => 'Hacked',
-            'destination_url' => 'https://example.com/hacked',
+            'destination_urls' => ['https://example.com/hacked'],
             'status' => 'active',
         ])
         ->assertForbidden();
@@ -299,16 +398,18 @@ test('leaving the provider secret blank on update keeps the existing secret', fu
     $user = User::factory()->create();
     $project = Project::factory()->for($user)->create();
     $provider = Provider::query()->where('key', 'generic_hmac')->firstOrFail();
-    $endpoint = WebhookEndpoint::factory()->for($project)->create([
-        'mode' => WebhookEndpointMode::Managed,
-        'provider_id' => $provider->id,
-        'provider_secret' => 'original-secret',
-    ]);
+    $endpoint = WebhookEndpoint::factory()->for($project)
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->create([
+            'mode' => WebhookEndpointMode::Managed,
+            'provider_id' => $provider->id,
+            'provider_secret' => 'original-secret',
+        ]);
 
     $this->actingAs($user)->put("/webhook-endpoints/{$endpoint->id}", [
         'name' => $endpoint->name,
         'mode' => 'managed',
-        'destination_url' => $endpoint->destination_url,
+        'destination_urls' => ['https://example.com/hooks'],
         'status' => 'active',
         'provider_id' => $provider->id,
         'provider_secret' => '',
@@ -322,16 +423,18 @@ test('providing a new provider secret on update rotates it', function () {
     $user = User::factory()->create();
     $project = Project::factory()->for($user)->create();
     $provider = Provider::query()->where('key', 'generic_hmac')->firstOrFail();
-    $endpoint = WebhookEndpoint::factory()->for($project)->create([
-        'mode' => WebhookEndpointMode::Managed,
-        'provider_id' => $provider->id,
-        'provider_secret' => 'original-secret',
-    ]);
+    $endpoint = WebhookEndpoint::factory()->for($project)
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->create([
+            'mode' => WebhookEndpointMode::Managed,
+            'provider_id' => $provider->id,
+            'provider_secret' => 'original-secret',
+        ]);
 
     $this->actingAs($user)->put("/webhook-endpoints/{$endpoint->id}", [
         'name' => $endpoint->name,
         'mode' => 'managed',
-        'destination_url' => $endpoint->destination_url,
+        'destination_urls' => ['https://example.com/hooks'],
         'status' => 'active',
         'provider_id' => $provider->id,
         'provider_secret' => 'rotated-secret',
@@ -349,7 +452,7 @@ test('a managed endpoint can be created against a seeded provider', function () 
 
     $response = $this->actingAs($user)->post("/projects/{$project->id}/webhook-endpoints", [
         'name' => 'Managed endpoint',
-        'destination_url' => 'https://example.com/hooks',
+        'destination_urls' => ['https://example.com/hooks'],
         'mode' => 'managed',
         'provider_id' => $provider->id,
         'provider_secret' => 'super-secret',
@@ -374,21 +477,21 @@ test('a receive-only endpoint can be created without a destination url', functio
     $response->assertRedirect("/webhook-endpoints/{$endpoint->id}");
     expect($endpoint)
         ->mode->toBe(WebhookEndpointMode::Capture)
-        ->destination_url->toBeNull()
         ->status->toBe(WebhookEndpointStatus::Active);
+    expect($endpoint->destinations()->count())->toBe(0);
 });
 
-test('a receive-only endpoint drops a destination url it was sent anyway', function () {
+test('a receive-only endpoint drops destination urls it was sent anyway', function () {
     $user = User::factory()->create();
     $project = Project::factory()->for($user)->create();
 
     $this->actingAs($user)->post("/projects/{$project->id}/webhook-endpoints", [
         'name' => 'Barantum inbox',
         'mode' => 'capture',
-        'destination_url' => 'https://example.com/hooks',
+        'destination_urls' => ['https://example.com/hooks'],
     ]);
 
-    expect(WebhookEndpoint::first()->destination_url)->toBeNull();
+    expect(WebhookEndpoint::first()->destinations()->count())->toBe(0);
 });
 
 test('a relay endpoint cannot be created without a destination url', function () {
@@ -400,17 +503,17 @@ test('a relay endpoint cannot be created without a destination url', function ()
             'name' => 'Nowhere to go',
             'mode' => 'relay',
         ])
-        ->assertSessionHasErrors('destination_url');
+        ->assertSessionHasErrors('destination_urls');
 
     expect(WebhookEndpoint::count())->toBe(0);
 });
 
-test('switching an endpoint to receive only clears its destination url', function () {
+test('switching an endpoint to receive only clears its destination urls', function () {
     $user = User::factory()->create();
     $project = Project::factory()->for($user)->create();
-    $endpoint = WebhookEndpoint::factory()->for($project)->create([
-        'destination_url' => 'https://example.com/hooks',
-    ]);
+    $endpoint = WebhookEndpoint::factory()->for($project)
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->create();
 
     $this->actingAs($user)->put("/webhook-endpoints/{$endpoint->id}", [
         'name' => $endpoint->name,
@@ -419,8 +522,8 @@ test('switching an endpoint to receive only clears its destination url', functio
     ]);
 
     expect($endpoint->fresh())
-        ->mode->toBe(WebhookEndpointMode::Capture)
-        ->destination_url->toBeNull();
+        ->mode->toBe(WebhookEndpointMode::Capture);
+    expect($endpoint->fresh()->destinations()->count())->toBe(0);
 });
 
 test('switching a receive-only endpoint to relay requires a destination url', function () {
@@ -428,7 +531,6 @@ test('switching a receive-only endpoint to relay requires a destination url', fu
     $project = Project::factory()->for($user)->create();
     $endpoint = WebhookEndpoint::factory()->for($project)->create([
         'mode' => WebhookEndpointMode::Capture,
-        'destination_url' => null,
     ]);
 
     $this->actingAs($user)
@@ -437,11 +539,11 @@ test('switching a receive-only endpoint to relay requires a destination url', fu
             'mode' => 'relay',
             'status' => 'active',
         ])
-        ->assertSessionHasErrors('destination_url');
+        ->assertSessionHasErrors('destination_urls');
 
     expect($endpoint->fresh())
-        ->mode->toBe(WebhookEndpointMode::Capture)
-        ->destination_url->toBeNull();
+        ->mode->toBe(WebhookEndpointMode::Capture);
+    expect($endpoint->fresh()->destinations()->count())->toBe(0);
 });
 
 test('switching a receive-only endpoint to relay stores the destination url', function () {
@@ -449,19 +551,20 @@ test('switching a receive-only endpoint to relay stores the destination url', fu
     $project = Project::factory()->for($user)->create();
     $endpoint = WebhookEndpoint::factory()->for($project)->create([
         'mode' => WebhookEndpointMode::Capture,
-        'destination_url' => null,
     ]);
 
     $this->actingAs($user)->put("/webhook-endpoints/{$endpoint->id}", [
         'name' => $endpoint->name,
         'mode' => 'relay',
-        'destination_url' => 'https://example.com/hooks',
+        'destination_urls' => ['https://example.com/hooks'],
         'status' => 'active',
     ]);
 
-    expect($endpoint->fresh())
-        ->mode->toBe(WebhookEndpointMode::Relay)
-        ->destination_url->toBe('https://example.com/hooks');
+    $endpoint->refresh();
+
+    expect($endpoint)
+        ->mode->toBe(WebhookEndpointMode::Relay);
+    expect($endpoint->destinationUrls())->toBe(['https://example.com/hooks']);
 });
 
 test('switching an endpoint to managed requires a provider and a secret', function () {
@@ -469,14 +572,13 @@ test('switching an endpoint to managed requires a provider and a secret', functi
     $project = Project::factory()->for($user)->create();
     $endpoint = WebhookEndpoint::factory()->for($project)->create([
         'mode' => WebhookEndpointMode::Capture,
-        'destination_url' => null,
     ]);
 
     $this->actingAs($user)
         ->put("/webhook-endpoints/{$endpoint->id}", [
             'name' => $endpoint->name,
             'mode' => 'managed',
-            'destination_url' => 'https://example.com/hooks',
+            'destination_urls' => ['https://example.com/hooks'],
             'status' => 'active',
         ])
         ->assertSessionHasErrors(['provider_id', 'provider_secret']);
@@ -492,13 +594,12 @@ test('switching an endpoint to managed stores the provider and secret', function
     $provider = Provider::query()->where('key', 'generic_hmac')->firstOrFail();
     $endpoint = WebhookEndpoint::factory()->for($project)->create([
         'mode' => WebhookEndpointMode::Capture,
-        'destination_url' => null,
     ]);
 
     $this->actingAs($user)->put("/webhook-endpoints/{$endpoint->id}", [
         'name' => $endpoint->name,
         'mode' => 'managed',
-        'destination_url' => 'https://example.com/hooks',
+        'destination_urls' => ['https://example.com/hooks'],
         'status' => 'active',
         'provider_id' => $provider->id,
         'provider_secret' => 'fresh-secret',

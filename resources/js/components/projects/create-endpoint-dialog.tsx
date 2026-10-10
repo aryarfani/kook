@@ -36,14 +36,26 @@ export function CreateEndpointDialog({
 }) {
     const [mode, setMode] = useState<WebhookEndpointMode>('relay');
     const [providerId, setProviderId] = useState<string | undefined>();
+    const [destinationUrls, setDestinationUrls] = useState<string[]>(['']);
     const selectedProvider = providers.find((p) => p.id === providerId);
     const secretGuidance = providerSecretGuidance(selectedProvider?.key);
+
+    const setDestinationUrl = (index: number, value: string) =>
+        setDestinationUrls((urls) =>
+            urls.map((url, i) => (i === index ? value : url)),
+        );
+    const addDestinationUrl = () => setDestinationUrls((urls) => [...urls, '']);
+    const removeDestinationUrl = (index: number) =>
+        setDestinationUrls((urls) =>
+            urls.length > 1 ? urls.filter((_, i) => i !== index) : urls,
+        );
 
     return (
         <Dialog
             onOpenChange={() => {
                 setMode('relay');
                 setProviderId(undefined);
+                setDestinationUrls(['']);
             }}
         >
             <DialogTrigger asChild>
@@ -84,17 +96,64 @@ export function CreateEndpointDialog({
 
                             {mode !== 'capture' && (
                                 <div className="grid gap-2">
-                                    <Label htmlFor="destination_url">
-                                        Destination URL
-                                    </Label>
-                                    <Input
-                                        id="destination_url"
-                                        name="destination_url"
-                                        required
-                                        placeholder="https://your-app.com/webhooks"
-                                    />
+                                    <Label>Destination URLs</Label>
+                                    <p className="text-sm text-muted-foreground">
+                                        Every event is forwarded to each URL
+                                        listed here.
+                                    </p>
+                                    {destinationUrls.map((url, index) => (
+                                        <div key={index} className="grid gap-1">
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    name="destination_urls[]"
+                                                    value={url}
+                                                    onChange={(event) =>
+                                                        setDestinationUrl(
+                                                            index,
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="https://your-app.com/webhooks"
+                                                    aria-label={`Destination URL ${index + 1}`}
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    variant="secondary"
+                                                    onClick={() =>
+                                                        removeDestinationUrl(
+                                                            index,
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        destinationUrls.length ===
+                                                        1
+                                                    }
+                                                    data-test={`remove-destination-url-${index}`}
+                                                >
+                                                    Remove
+                                                </Button>
+                                            </div>
+                                            <InputError
+                                                message={
+                                                    errors[
+                                                        `destination_urls.${index}`
+                                                    ]
+                                                }
+                                            />
+                                        </div>
+                                    ))}
+                                    <div>
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            onClick={addDestinationUrl}
+                                            data-test="add-destination-url-button"
+                                        >
+                                            Add destination
+                                        </Button>
+                                    </div>
                                     <InputError
-                                        message={errors.destination_url}
+                                        message={errors.destination_urls}
                                     />
                                 </div>
                             )}

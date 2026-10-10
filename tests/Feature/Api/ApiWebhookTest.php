@@ -82,9 +82,10 @@ test('a key can replay a successful event', function () {
     $project = Project::factory()->for($user)->create();
     [, $plainKey] = app(ApiKeyService::class)->generate($user, $project, 'Test key');
 
-    $endpoint = WebhookEndpoint::factory()->for($project)->create([
-        'destination_url' => 'https://example.com/hooks',
-    ]);
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->for($project)
+        ->create();
     $event = WebhookEvent::factory()->create([
         'webhook_endpoint_id' => $endpoint->id,
         'project_id' => $project->id,

@@ -101,7 +101,13 @@ export default function ProjectsShow({
                                                     </StatusChip>
                                                 </div>
                                                 <p className="mt-1 truncate text-sm text-muted-foreground">
-                                                    {endpoint.destination_url}
+                                                    {
+                                                        endpoint
+                                                            .destination_urls[0]
+                                                    }
+                                                    {endpoint.destination_urls
+                                                        .length > 1 &&
+                                                        ` +${endpoint.destination_urls.length - 1} more`}
                                                 </p>
                                                 <div className="mt-4 flex items-center justify-between border-t border-border pt-4 text-sm">
                                                     <span className="text-muted-foreground">

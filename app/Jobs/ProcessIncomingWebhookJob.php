@@ -23,7 +23,7 @@ class ProcessIncomingWebhookJob implements ShouldQueue
 
     public function handle(ProviderVerifierFactory $verifierFactory, AuditLogService $auditLog): void
     {
-        $event = WebhookEvent::with('webhookEndpoint.provider', 'webhookEndpoint.project')
+        $event = WebhookEvent::with('webhookEndpoint.provider', 'webhookEndpoint.project', 'webhookEndpoint.destinations')
             ->find($this->webhookEventId);
 
         if ($event === null) {
@@ -59,7 +59,11 @@ class ProcessIncomingWebhookJob implements ShouldQueue
 
         $event->update(['status' => WebhookEventStatus::Success]);
 
-        ForwardWebhookDeliveryJob::dispatch($event->id)->afterCommit();
+        // Fan out: each configured destination gets its own delivery job with
+        // its own retry chain and attempt numbering.
+        foreach ($endpoint->destinations as $destination) {
+            ForwardWebhookDeliveryJob::dispatch($event->id, $destination->id)->afterCommit();
+        }
     }
 
     private function verifySignature(WebhookEvent $event, ProviderVerifierFactory $verifierFactory): bool

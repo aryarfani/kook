@@ -40,8 +40,15 @@ export const endpoints = [
     project_id: projects[project].id,
     name,
     mode,
-    destination_url:
-        mode === 'capture' ? null : `https://app-${n + 1}.example/webhooks`,
+    destination_urls:
+        mode === 'capture'
+            ? []
+            : n === 3
+              ? [
+                    `https://app-${n + 1}.example/webhooks`,
+                    `https://mirror-${n + 1}.example/webhooks`,
+                ]
+              : [`https://app-${n + 1}.example/webhooks`],
     provider_id: provider === null ? null : providers[provider].id,
     provider: provider === null ? null : providers[provider],
     ingest_token: `synthetic-preview-endpoint-${n + 1}`,
@@ -200,6 +207,14 @@ export const deliveries = new Map(
                 event_id: event.id,
                 attempt_number: attempt + 1,
                 status,
+                destination_url:
+                    event.webhookEndpoint.destination_urls[
+                        attempt %
+                            Math.max(
+                                event.webhookEndpoint.destination_urls.length,
+                                1,
+                            )
+                    ] ?? null,
                 http_status_code: status === 'delivered' ? 200 : 502,
                 response_body:
                     status === 'delivered'

@@ -19,7 +19,6 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property string|null $event_title_format
  * @property WebhookEndpointMode $mode
- * @property string $destination_url
  * @property string|null $provider_id
  * @property string|null $provider_secret
  * @property string $ingest_token
@@ -37,7 +36,6 @@ class WebhookEndpoint extends Model
         'name',
         'event_title_format',
         'mode',
-        'destination_url',
         'provider_id',
         'provider_secret',
         'status',
@@ -75,6 +73,27 @@ class WebhookEndpoint extends Model
     public function provider(): BelongsTo
     {
         return $this->belongsTo(Provider::class);
+    }
+
+    /**
+     * @return HasMany<WebhookEndpointDestination, $this>
+     */
+    public function destinations(): HasMany
+    {
+        return $this->hasMany(WebhookEndpointDestination::class)
+            ->orderBy('sort_order')
+            ->orderBy('created_at');
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function destinationUrls(): array
+    {
+        /** @var list<string> $urls */
+        $urls = $this->destinations->pluck('url')->all();
+
+        return $urls;
     }
 
     /**

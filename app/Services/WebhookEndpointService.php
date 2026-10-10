@@ -7,6 +7,7 @@ use App\Enums\WebhookEndpointStatus;
 use App\Models\Project;
 use App\Models\User;
 use App\Models\WebhookEndpoint;
+use App\Models\WebhookEndpointDestination;
 use App\Repositories\WebhookEndpointRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +34,9 @@ class WebhookEndpointService
     public function create(User $user, Project $project, array $data): WebhookEndpoint
     {
         return DB::transaction(function () use ($user, $project, $data) {
-            $endpoint = $this->endpoints->make($project, $this->withoutDestinationForCapture($data));
+            $data = $this->withoutDestinationsForCapture($data);
+
+            $endpoint = $this->endpoints->make($project, $data);
 
             // Never mass-assignable: these are system-generated, not client input.
             $endpoint->forceFill([
@@ -43,6 +46,8 @@ class WebhookEndpointService
             ]);
 
             $endpoint->save();
+
+            $this->syncDestinations($endpoint, $data['destination_urls'] ?? []);
 
             $this->auditLog->record($user, $project, 'webhook_endpoint.created', $endpoint, [
                 'name' => $endpoint->name,
@@ -66,7 +71,20 @@ class WebhookEndpointService
         }
 
         return DB::transaction(function () use ($user, $endpoint, $data) {
-            $endpoint = $this->endpoints->update($endpoint, $this->withoutDestinationForCapture($data));
+            $endpoint = $this->endpoints->update($endpoint, $this->withoutDestinationsForCapture($data));
+
+            // Only partial updates that speak the destination list touch it;
+            // e.g. the title-format action updates other attributes and must
+            // leave the destinations alone.
+            $destinations = match (true) {
+                ($data['mode'] ?? null) === WebhookEndpointMode::Capture->value => [],
+                array_key_exists('destination_urls', $data) => $data['destination_urls'],
+                default => null,
+            };
+
+            if ($destinations !== null) {
+                $this->syncDestinations($endpoint, $destinations);
+            }
 
             $this->auditLog->record($user, $endpoint->project, 'webhook_endpoint.updated', $endpoint);
 
@@ -99,19 +117,46 @@ class WebhookEndpointService
 
     /**
      * A receive-only endpoint has nowhere to forward to, so any destination
-     * is dropped on the way in - the form hides the field for that mode, which
-     * means an update would otherwise leave a stale URL behind.
+     * list is dropped on the way in - the form hides the field for that mode,
+     * which means an update would otherwise leave stale URLs behind.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function withoutDestinationForCapture(array $data): array
+    private function withoutDestinationsForCapture(array $data): array
     {
         if (($data['mode'] ?? null) !== WebhookEndpointMode::Capture->value) {
             return $data;
         }
 
-        return [...$data, 'destination_url' => null];
+        unset($data['destination_urls']);
+
+        return $data;
+    }
+
+    /**
+     * Reconcile the destination list. Existing rows whose URL survives keep
+     * their id, so queued delivery jobs referencing them still resolve; rows
+     * whose URL was removed are deleted and new URLs are appended in the
+     * submitted order.
+     *
+     * @param  list<string>  $urls
+     */
+    private function syncDestinations(WebhookEndpoint $endpoint, array $urls): void
+    {
+        $existing = $endpoint->destinations()->get()->keyBy('url');
+
+        foreach ($existing as $destination) {
+            if (! in_array($destination->url, $urls, true)) {
+                $destination->delete();
+            }
+        }
+
+        foreach ($urls as $order => $url) {
+            $destination = $existing->get($url) ?? new WebhookEndpointDestination(['url' => $url]);
+            $destination->sort_order = $order;
+            $endpoint->destinations()->save($destination);
+        }
     }
 
     private function uniqueIngestToken(): string

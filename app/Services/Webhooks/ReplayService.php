@@ -60,11 +60,17 @@ class ReplayService
         }
 
         DB::transaction(function () use ($event, $recordAudit) {
-            $existingAttempts = $event->deliveries()->count();
-
             $recordAudit();
 
-            ForwardWebhookDeliveryJob::dispatch($event->id, $existingAttempts)->afterCommit();
+            // Replay every configured destination, each continuing its own
+            // attempt sequence.
+            foreach ($event->webhookEndpoint->destinations as $destination) {
+                $existingAttempts = $event->deliveries()
+                    ->where('destination_id', $destination->id)
+                    ->count();
+
+                ForwardWebhookDeliveryJob::dispatch($event->id, $destination->id, $existingAttempts)->afterCommit();
+            }
         });
     }
 }

@@ -53,6 +53,7 @@ export type WebhookDelivery = {
     event_id: string;
     attempt_number: number;
     status: WebhookDeliveryStatus;
+    destination_url?: string | null;
     http_status_code: number | null;
     response_body: string | null;
     error_message: string | null;

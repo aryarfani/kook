@@ -77,6 +77,11 @@ export function EventDetailSections({
                                     <p className="text-sm font-medium">
                                         Attempt {delivery.attempt_number}
                                     </p>
+                                    {delivery.destination_url && (
+                                        <p className="text-xs break-all text-muted-foreground">
+                                            → {delivery.destination_url}
+                                        </p>
+                                    )}
                                     <p className="text-sm break-words text-muted-foreground">
                                         {delivery.http_status_code
                                             ? `HTTP ${delivery.http_status_code}`

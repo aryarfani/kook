@@ -19,13 +19,21 @@ trait WebhookEndpointValidationRules
 
     /**
      * Relay and managed endpoints both have somewhere to forward to; only a
-     * receive-only endpoint may leave the destination empty.
+     * receive-only endpoint may leave the destination list empty. Every URL
+     * is checked against the SSRF guard on its own.
      *
-     * @return array<int, mixed>
+     * @return array<string, array<int, mixed>>
      */
     protected function destinationUrlRules(): array
     {
-        return ['nullable', 'required_unless:mode,capture', 'string', 'max:2048', new PublicHttpUrl];
+        return [
+            'destination_urls' => [
+                'nullable',
+                'array',
+                'required_unless:mode,capture',
+            ],
+            'destination_urls.*' => ['required', 'string', 'max:2048', 'distinct', new PublicHttpUrl],
+        ];
     }
 
     /**

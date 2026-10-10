@@ -16,9 +16,10 @@ test('replaying with the same idempotency key does not queue a second delivery a
     $project = Project::factory()->for($user)->create();
     [, $plainKey] = app(ApiKeyService::class)->generate($user, $project, 'Test key');
 
-    $endpoint = WebhookEndpoint::factory()->for($project)->create([
-        'destination_url' => 'https://example.com/hooks',
-    ]);
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->for($project)
+        ->create();
     $event = WebhookEvent::factory()->create([
         'webhook_endpoint_id' => $endpoint->id,
         'project_id' => $project->id,
@@ -40,9 +41,10 @@ test('replaying without an idempotency key queues a new attempt every time', fun
     $project = Project::factory()->for($user)->create();
     [, $plainKey] = app(ApiKeyService::class)->generate($user, $project, 'Test key');
 
-    $endpoint = WebhookEndpoint::factory()->for($project)->create([
-        'destination_url' => 'https://example.com/hooks',
-    ]);
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->for($project)
+        ->create();
     $event = WebhookEvent::factory()->create([
         'webhook_endpoint_id' => $endpoint->id,
         'project_id' => $project->id,

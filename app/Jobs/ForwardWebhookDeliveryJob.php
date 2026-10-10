@@ -6,6 +6,8 @@ use App\Actions\ForwardWebhookAction;
 use App\Enums\WebhookDeliveryStatus;
 use App\Enums\WebhookEndpointMode;
 use App\Exceptions\WebhookDeliveryFailedException;
+use App\Models\WebhookDelivery;
+use App\Models\WebhookEndpointDestination;
 use App\Models\WebhookEvent;
 use App\Repositories\WebhookDeliveryRepository;
 use App\Services\AuditLogService;
@@ -15,6 +17,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 use Throwable;
 
 class ForwardWebhookDeliveryJob implements ShouldQueue
@@ -24,13 +27,18 @@ class ForwardWebhookDeliveryJob implements ShouldQueue
     public int $tries = 6;
 
     /**
+     * @param  string  $webhookDestinationId  The endpoint destination this
+     *                                        job delivers to; one job runs
+     *                                        per destination.
      * @param  int  $attemptOffset  Number of delivery attempts already recorded
-     *                              for this event (nonzero on a replay), so the
-     *                              stored attempt_number continues the sequence
-     *                              instead of restarting at 1.
+     *                              for this event and destination (nonzero on a
+     *                              replay), so the stored attempt_number
+     *                              continues the sequence instead of
+     *                              restarting at 1.
      */
     public function __construct(
         public readonly string $webhookEventId,
+        public readonly string $webhookDestinationId,
         public readonly int $attemptOffset = 0,
     ) {}
 
@@ -59,9 +67,21 @@ class ForwardWebhookDeliveryJob implements ShouldQueue
             return;
         }
 
-        // The automatic retry chain (attemptOffset 0) stands down once the event
-        // has already been delivered, e.g. a manual replay succeeded while this
-        // retry was still pending. Explicit replays (attemptOffset > 0) always run.
+        // The destination may have been removed from the endpoint after this
+        // job was queued; there is nowhere left to deliver it.
+        $destination = Str::isUuid($this->webhookDestinationId)
+            ? WebhookEndpointDestination::find($this->webhookDestinationId)
+            : null;
+
+        if ($destination === null || $destination->webhook_endpoint_id !== $event->webhookEndpoint->id) {
+            return;
+        }
+
+        // The automatic retry chain (attemptOffset 0) stands down once this
+        // event has already been delivered to this destination, e.g. a manual
+        // replay succeeded while this retry was still pending. Deliveries to
+        // other destinations do not stand this one down. Explicit replays
+        // (attemptOffset > 0) always run.
         if ($this->attemptOffset === 0 && $this->alreadyDelivered($event)) {
             return;
         }
@@ -69,9 +89,10 @@ class ForwardWebhookDeliveryJob implements ShouldQueue
         $queueAttempt = $this->attempts();
         $isFinalAttempt = $queueAttempt >= $this->tries;
 
-        $result = $forward->execute($event);
+        $result = $forward->execute($event, $destination->url);
 
         $deliveries->create($event, [
+            'destination_id' => $destination->id,
             'attempt_number' => $this->attemptOffset + $queueAttempt,
             'status' => match (true) {
                 $result->successful => WebhookDeliveryStatus::Delivered,
@@ -109,12 +130,18 @@ class ForwardWebhookDeliveryJob implements ShouldQueue
             ['webhook_endpoint_id' => $event->webhookEndpoint->id],
         );
 
-        app(WebhookFailureNotificationService::class)->notifyExhausted($event);
+        $destination = Str::isUuid($this->webhookDestinationId)
+            ? WebhookEndpointDestination::find($this->webhookDestinationId)
+            : null;
+
+        app(WebhookFailureNotificationService::class)->notifyExhausted($event, $destination?->url);
     }
 
     private function alreadyDelivered(WebhookEvent $event): bool
     {
-        return $event->deliveries()
+        return WebhookDelivery::query()
+            ->where('event_id', $event->id)
+            ->where('destination_id', $this->webhookDestinationId)
             ->where('status', WebhookDeliveryStatus::Delivered)
             ->exists();
     }

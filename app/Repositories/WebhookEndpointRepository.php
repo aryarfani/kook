@@ -16,6 +16,7 @@ class WebhookEndpointRepository
         /** @var Collection<int, WebhookEndpoint> */
         return $project->webhookEndpoints()
             ->with([
+                'destinations',
                 'latestEvent:id,webhook_endpoint_id,status,received_at',
                 'latestEvent.latestDelivery:id,event_id,status,attempt_number',
             ])

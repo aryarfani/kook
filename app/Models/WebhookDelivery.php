@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property string $id
  * @property string $event_id
+ * @property string|null $destination_id
  * @property int $attempt_number
  * @property WebhookDeliveryStatus $status
  * @property int|null $http_status_code
@@ -30,6 +31,7 @@ class WebhookDelivery extends Model
     use HasFactory, HasUuids;
 
     protected $fillable = [
+        'destination_id',
         'attempt_number',
         'status',
         'http_status_code',
@@ -58,5 +60,13 @@ class WebhookDelivery extends Model
     public function event(): BelongsTo
     {
         return $this->belongsTo(WebhookEvent::class, 'event_id');
+    }
+
+    /**
+     * @return BelongsTo<WebhookEndpointDestination, $this>
+     */
+    public function destination(): BelongsTo
+    {
+        return $this->belongsTo(WebhookEndpointDestination::class);
     }
 }

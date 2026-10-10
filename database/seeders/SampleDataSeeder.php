@@ -12,6 +12,7 @@ use App\Models\Provider;
 use App\Models\User;
 use App\Models\WebhookDelivery;
 use App\Models\WebhookEndpoint;
+use App\Models\WebhookEndpointDestination;
 use App\Models\WebhookEvent;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
@@ -39,9 +40,9 @@ class SampleDataSeeder extends Seeder
             return;
         }
 
-        $stripe = $this->endpoint($project, 'Stripe production', WebhookEndpointMode::Managed, 'https://api.acme.test/webhooks/stripe', ProviderKey::Stripe, WebhookEndpointStatus::Active);
-        $github = $this->endpoint($project, 'GitHub CI relay', WebhookEndpointMode::Relay, 'https://ci.acme.test/hooks/github', ProviderKey::GitHub, WebhookEndpointStatus::Active);
-        $shopify = $this->endpoint($project, 'Shopify orders (paused)', WebhookEndpointMode::Relay, 'https://ops.acme.test/shopify', ProviderKey::Shopify, WebhookEndpointStatus::Paused);
+        $stripe = $this->endpoint($project, 'Stripe production', WebhookEndpointMode::Managed, ['https://api.acme.test/webhooks/stripe'], ProviderKey::Stripe, WebhookEndpointStatus::Active);
+        $github = $this->endpoint($project, 'GitHub CI relay', WebhookEndpointMode::Relay, ['https://ci.acme.test/hooks/github', 'https://mirror.acme.test/hooks/github'], ProviderKey::GitHub, WebhookEndpointStatus::Active);
+        $shopify = $this->endpoint($project, 'Shopify orders (paused)', WebhookEndpointMode::Relay, ['https://ops.acme.test/shopify'], ProviderKey::Shopify, WebhookEndpointStatus::Paused);
 
         $this->deliveredEvent($stripe, 'payment_intent.succeeded', <<<'JSON'
         {
@@ -140,18 +141,20 @@ class SampleDataSeeder extends Seeder
         JSON);
     }
 
+    /**
+     * @param  list<string>  $destinationUrls
+     */
     private function endpoint(
         Project $project,
         string $name,
         WebhookEndpointMode $mode,
-        string $destinationUrl,
+        array $destinationUrls,
         ProviderKey $providerKey,
         WebhookEndpointStatus $status,
     ): WebhookEndpoint {
         $endpoint = $project->webhookEndpoints()->make([
             'name' => $name,
             'mode' => $mode,
-            'destination_url' => $destinationUrl,
             'provider_id' => Provider::query()->where('key', $providerKey)->value('id'),
         ]);
 
@@ -160,6 +163,14 @@ class SampleDataSeeder extends Seeder
             'signing_secret' => Str::random(48),
             'status' => $status,
         ])->save();
+
+        foreach ($destinationUrls as $order => $url) {
+            WebhookEndpointDestination::create([
+                'webhook_endpoint_id' => $endpoint->id,
+                'url' => $url,
+                'sort_order' => $order,
+            ]);
+        }
 
         return $endpoint;
     }

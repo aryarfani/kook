@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\WebhookDeliveryStatus;
 use App\Enums\WebhookEndpointMode;
 use App\Enums\WebhookEventStatus;
 use App\Models\AuditLog;
@@ -15,15 +16,19 @@ test('a user can replay their own successful event', function () {
 
     $user = User::factory()->create();
     $project = Project::factory()->for($user)->create();
-    $endpoint = WebhookEndpoint::factory()->for($project)->create([
-        'destination_url' => 'https://example.com/hooks',
-    ]);
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->for($project)
+        ->create();
     $event = WebhookEvent::factory()->create([
         'webhook_endpoint_id' => $endpoint->id,
         'project_id' => $project->id,
         'status' => WebhookEventStatus::Success,
     ]);
-    WebhookDelivery::factory()->for($event, 'event')->create(['attempt_number' => 1]);
+    WebhookDelivery::factory()->for($event, 'event')->create([
+        'destination_id' => $endpoint->destinations[0]->id,
+        'attempt_number' => 1,
+    ]);
 
     $this->actingAs($user)
         ->post("/events/{$event->id}/replay")
@@ -35,6 +40,42 @@ test('a user can replay their own successful event', function () {
 
     $log = AuditLog::where('action', 'webhook_event.replayed')->first();
     expect($log)->not->toBeNull();
+});
+
+test('replaying an event dispatches a delivery per destination, each continuing its own attempt sequence', function () {
+    Http::fake(['example.com/*' => Http::response('ok', 200)]);
+
+    $user = User::factory()->create();
+    $project = Project::factory()->for($user)->create();
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/hooks', 'https://example.com/mirror'])
+        ->for($project)
+        ->create();
+    $event = WebhookEvent::factory()->create([
+        'webhook_endpoint_id' => $endpoint->id,
+        'project_id' => $project->id,
+        'status' => WebhookEventStatus::Success,
+    ]);
+
+    // One prior attempt each: destination A delivered, destination B failed.
+    WebhookDelivery::factory()->for($event, 'event')->create([
+        'destination_id' => $endpoint->destinations[0]->id,
+        'attempt_number' => 1,
+        'status' => WebhookDeliveryStatus::Delivered,
+    ]);
+    WebhookDelivery::factory()->for($event, 'event')->create([
+        'destination_id' => $endpoint->destinations[1]->id,
+        'attempt_number' => 3,
+        'status' => WebhookDeliveryStatus::Failed,
+    ]);
+
+    $this->actingAs($user)
+        ->post("/events/{$event->id}/replay")
+        ->assertRedirect();
+
+    expect(WebhookDelivery::where('event_id', $event->id)->where('destination_id', $endpoint->destinations[0]->id)->count())->toBe(2);
+    expect(WebhookDelivery::where('event_id', $event->id)->where('destination_id', $endpoint->destinations[1]->id)->count())->toBe(2);
+    expect(WebhookDelivery::where('event_id', $event->id)->where('attempt_number', 2)->count())->toBe(2);
 });
 
 test('a user cannot replay another users event', function () {
@@ -73,7 +114,6 @@ test('an event from a receive-only endpoint cannot be replayed', function () {
     $project = Project::factory()->for($user)->create();
     $endpoint = WebhookEndpoint::factory()->for($project)->create([
         'mode' => WebhookEndpointMode::Capture,
-        'destination_url' => null,
     ]);
     $event = WebhookEvent::factory()->create([
         'webhook_endpoint_id' => $endpoint->id,
@@ -94,9 +134,10 @@ test('replay is rate limited', function () {
 
     $user = User::factory()->create();
     $project = Project::factory()->for($user)->create();
-    $endpoint = WebhookEndpoint::factory()->for($project)->create([
-        'destination_url' => 'https://example.com/hooks',
-    ]);
+    $endpoint = WebhookEndpoint::factory()
+        ->withDestinationUrls(['https://example.com/hooks'])
+        ->for($project)
+        ->create();
     $event = WebhookEvent::factory()->create([
         'webhook_endpoint_id' => $endpoint->id,
         'project_id' => $project->id,
