@@ -100,6 +100,36 @@ test('selection is scoped to the visible filters and owner', function () {
         ->assertInertia(fn ($page) => $page->where('selectedEvent', null)->has('events.data', 0));
 });
 
+test('partial reloads resolve only the props they request', function () {
+    $queries = [];
+    DB::listen(function (QueryExecuted $query) use (&$queries) {
+        $queries[] = $query->sql;
+    });
+
+    $response = $this->actingAs($this->user)->get('/events?event='.$this->event->id);
+    $queries = [];
+
+    $response->assertOk()->assertInertia(fn ($page) => $page
+        ->component('events/index')
+        ->has('events.data', 1)
+        ->has('selectedEvent.event')
+        ->reload(only: ['selectedEvent'], callback: function ($partial) {
+            $partial->where('selectedEvent.event.id', $this->event->id)
+                ->missing('events')->missing('projects')->missing('endpoints');
+        }));
+
+    expect(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'count(*)')))->toBeEmpty();
+
+    $queries = [];
+    $response->assertInertia(fn ($page) => $page
+        ->reload(only: ['events'], callback: function ($partial) {
+            $partial->has('events.data', 1)
+                ->missing('selectedEvent')->missing('projects')->missing('endpoints');
+        }));
+
+    expect(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'count(*)')))->toHaveCount(1);
+});
+
 test('legacy event links redirect to the canonical page after ownership checks', function () {
     $this->actingAs($this->user)->get('/events/'.$this->event->id)
         ->assertRedirect(route('webhook-events.index', ['event' => $this->event->id]));

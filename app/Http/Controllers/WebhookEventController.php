@@ -32,24 +32,29 @@ class WebhookEventController extends Controller
         $user = $request->user();
         $query = $this->browser->query($user, $filters);
         $eventId = $request->validated('event');
-        $selectedEvent = is_string($eventId) && $eventId !== ''
-            ? (clone $query)->with('webhookEndpoint')->whereKey($eventId)->first()
-            : null;
 
+        // Closure props are only evaluated when the request asks for them, so
+        // selecting an event or loading the next inbox page skips the others.
         return Inertia::render('events/index', [
-            'events' => (clone $query)
+            'events' => fn () => (clone $query)
                 ->select(['id', 'project_id', 'webhook_endpoint_id', 'event_name', 'status', 'received_at', 'signature_valid', 'payload'])
                 ->with(['project:id,name', 'webhookEndpoint:id,name,project_id,mode,event_title_format', 'latestDelivery:id,event_id,attempt_number,status,http_status_code'])
                 ->paginate(25)->appends($filters)
                 ->through(fn (WebhookEvent $event) => $this->browser->row($event)),
-            'projects' => $user->projects()->select(['id', 'name'])->orderBy('name')->get(),
-            'endpoints' => WebhookEndpoint::query()->whereIn('project_id', $user->projects()->select('id'))
+            'projects' => fn () => $user->projects()->select(['id', 'name'])->orderBy('name')->get(),
+            'endpoints' => fn () => WebhookEndpoint::query()->whereIn('project_id', $user->projects()->select('id'))
                 ->select(['id', 'name', 'project_id', 'mode', 'event_title_format'])->orderBy('name')->get(),
             'filters' => $filters,
-            'selectedEvent' => $selectedEvent === null ? null : [
-                'event' => (new WebhookEventResource($selectedEvent))->resolve($request),
-                'deliveries' => WebhookDeliveryResource::collection($this->events->deliveriesFor($selectedEvent))->toArray($request),
-            ],
+            'selectedEvent' => function () use ($query, $eventId, $request) {
+                $selectedEvent = is_string($eventId) && $eventId !== ''
+                    ? (clone $query)->with('webhookEndpoint')->whereKey($eventId)->first()
+                    : null;
+
+                return $selectedEvent === null ? null : [
+                    'event' => (new WebhookEventResource($selectedEvent))->resolve($request),
+                    'deliveries' => WebhookDeliveryResource::collection($this->events->deliveriesFor($selectedEvent))->toArray($request),
+                ];
+            },
         ]);
     }
 
