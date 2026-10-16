@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\WebhookEndpointMode;
 use App\Enums\WebhookEndpointStatus;
 use Database\Factories\WebhookEndpointFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -49,6 +50,11 @@ class WebhookEndpoint extends Model
     // not this cast.
     protected $hidden = ['provider_secret'];
 
+    // Pages read destination_urls as a plain list. It is only serialized when the
+    // destinations relation is already loaded, so an endpoint nested in another
+    // model never triggers a lazy query.
+    protected $appends = ['destination_urls'];
+
     protected function casts(): array
     {
         return [
@@ -88,12 +94,22 @@ class WebhookEndpoint extends Model
     /**
      * @return list<string>
      */
-    public function destinationUrls(): array
+    public function destinationUrlList(): array
     {
         /** @var list<string> $urls */
         $urls = $this->destinations->pluck('url')->all();
 
         return $urls;
+    }
+
+    /**
+     * @return Attribute<list<string>|null, never>
+     */
+    protected function destinationUrls(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->relationLoaded('destinations') ? $this->destinationUrlList() : null,
+        );
     }
 
     /**

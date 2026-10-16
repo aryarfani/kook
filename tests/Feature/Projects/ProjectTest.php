@@ -107,6 +107,21 @@ test('a user can view their own project', function () {
         );
 });
 
+test('the project page exposes the destination urls of each endpoint', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->for($user)->create();
+    WebhookEndpoint::factory()
+        ->for($project)
+        ->withDestinationUrls(['https://a.example.com/hook', 'https://b.example.com/hook'])
+        ->create();
+
+    $this->actingAs($user)
+        ->get("/projects/{$project->id}")
+        ->assertInertia(fn ($page) => $page
+            ->where('webhookEndpoints.0.destination_urls', ['https://a.example.com/hook', 'https://b.example.com/hook'])
+        );
+});
+
 test('the project switcher lists all of a users projects', function () {
     $user = User::factory()->create();
     $project = Project::factory()->for($user)->create();

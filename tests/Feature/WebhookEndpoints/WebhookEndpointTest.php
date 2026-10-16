@@ -49,7 +49,7 @@ test('a relay endpoint can be created with several destination urls stored in or
 
     $endpoint = WebhookEndpoint::first();
 
-    expect($endpoint->destinationUrls())->toBe([
+    expect($endpoint->destinationUrlList())->toBe([
         'https://example.com/first',
         'https://example.com/second',
     ]);
@@ -292,7 +292,7 @@ test('updating destination urls removes removed rows, keeps kept rows, and appen
 
     $endpoint->refresh();
 
-    expect($endpoint->destinationUrls())->toBe([
+    expect($endpoint->destinationUrlList())->toBe([
         'https://example.com/keep',
         'https://example.com/added',
     ]);
@@ -564,7 +564,7 @@ test('switching a receive-only endpoint to relay stores the destination url', fu
 
     expect($endpoint)
         ->mode->toBe(WebhookEndpointMode::Relay);
-    expect($endpoint->destinationUrls())->toBe(['https://example.com/hooks']);
+    expect($endpoint->destinationUrlList())->toBe(['https://example.com/hooks']);
 });
 
 test('switching an endpoint to managed requires a provider and a secret', function () {
